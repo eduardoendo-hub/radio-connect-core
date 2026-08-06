@@ -9,6 +9,7 @@ import { rotasAuth } from './modules/auth/rotas.js'
 import { rotasNoAr } from './modules/noar/rotas.js'
 import { rotasMomentos } from './modules/momentos/rotas.js'
 import { rotasStudio } from './modules/studio/rotas.js'
+import { iniciarAgendador, pararAgendador } from './modules/noar/agendador.js'
 
 const app = express()
 
@@ -85,6 +86,7 @@ const servidor = app.listen(env.PORT, () => {
 
 async function encerrar(sinal: string) {
   log.info({ sinal }, 'encerrando')
+  pararAgendador()
   servidor.close()
   await Promise.allSettled([desconectarBanco(), desconectarRedis()])
   process.exit(0)
@@ -93,9 +95,15 @@ async function encerrar(sinal: string) {
 process.on('SIGTERM', () => void encerrar('SIGTERM'))
 process.on('SIGINT', () => void encerrar('SIGINT'))
 
-void conectarBanco().catch((e) => {
-  log.fatal({ err: e }, 'nao foi possivel conectar ao banco')
-  process.exit(1)
-})
+void conectarBanco()
+  .then(() => {
+    // O relógio da plataforma: encerra Momentos vencidos, publica os agendados e
+    // mantém o Estado No Ar acompanhando a virada de programa.
+    iniciarAgendador()
+  })
+  .catch((e) => {
+    log.fatal({ err: e }, 'nao foi possivel conectar ao banco')
+    process.exit(1)
+  })
 
 export { app }
