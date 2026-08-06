@@ -4,7 +4,7 @@ import { prisma } from '../../lib/prisma.js'
 import { redis } from '../../lib/redis.js'
 import { assinar } from '../../lib/token.js'
 import { env, smsEmModoDemo } from '../../lib/env.js'
-import { erros } from '../../lib/erros.js'
+import { erros, ErroDaApi } from '../../lib/erros.js'
 import { log } from '../../lib/log.js'
 import { exigirOuvinte } from '../../middleware/sessao.js'
 
@@ -28,14 +28,30 @@ rotasAuth.post('/codigo', async (req, res, next) => {
   try {
     const { telefone } = pedirCodigo.parse(req.body)
     const numero = soDigitos(telefone)
-    if (numero.length < 10) throw erros.dadosInvalidos([{ campo: 'telefone', problema: 'número incompleto' }])
+    // Mensagem que a pessoa entende, não código de validação.
+    if (numero.length < 10) {
+      throw new ErroDaApi(422, 'telefone_invalido',
+        'Digite seu telefone com DDD, só números.')
+    }
 
     const chave = `otp:${req.emissora!.id}:${numero}`
     const tentativas = `otp:tent:${req.emissora!.id}:${numero}`
 
+    // Em produção o limite protege contra abuso de SMS, que custa dinheiro. No modo
+    // demonstração não há SMS nenhum, e um teto baixo só atrapalha quem está testando.
+    const teto = smsEmModoDemo ? 60 : 5
     const n = await redis.incr(tentativas)
     if (n === 1) await redis.expire(tentativas, 600)
-    if (n > 5) throw erros.muitasTentativas()
+    if (n > teto) {
+      const faltam = await redis.ttl(tentativas)
+      throw new ErroDaApi(
+        429,
+        'muitas_tentativas',
+        faltam > 0
+          ? `Muitas tentativas. Tente de novo em ${Math.ceil(faltam / 60)} minutos.`
+          : 'Muitas tentativas. Aguarde um instante.',
+      )
+    }
 
     // Sem gateway configurado, o código é fixo e sai no log. É o modo da demonstração.
     const codigo = smsEmModoDemo ? '000000' : String(Math.floor(100000 + Math.random() * 900000))
@@ -64,12 +80,12 @@ rotasAuth.post('/entrar', async (req, res, next) => {
     const chave = `otp:${req.emissora!.id}:${numero}`
 
     const esperado = await redis.get(chave)
-    if (!esperado || esperado !== codigo) {
-      throw new (await import('../../lib/erros.js')).ErroDaApi(
-        401,
-        'codigo_invalido',
-        'Código incorreto ou expirado. Peça um novo.',
-      )
+    if (!esperado) {
+      throw new ErroDaApi(401, 'codigo_expirado',
+        'O código expirou. Peça um novo para continuar.')
+    }
+    if (esperado !== codigo) {
+      throw new ErroDaApi(401, 'codigo_invalido', 'Código incorreto. Confira e tente de novo.')
     }
     await redis.del(chave)
 
