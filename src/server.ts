@@ -20,7 +20,9 @@ app.set('trust proxy', 1)
 
 app.use(express.json({ limit: '512kb' }))
 
-// CORS só para o Studio. O app não é navegador e não precisa disso.
+// CORS para as origens de navegador: o Studio e, enquanto o app roda como web,
+// também ele. Compilado como pacote nativo o app deixa de ser navegador e o
+// cabeçalho passa a ser irrelevante — mas a lista continua servindo ao Studio.
 app.use((req, res, next) => {
   const origem = req.headers.origin
   if (origem && origensStudio.includes(origem)) {

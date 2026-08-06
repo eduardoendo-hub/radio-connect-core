@@ -31,6 +31,13 @@ const esquema = z.object({
   // Nunca fazer o ouvinte esperar por publicidade que não veio.
   AD_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
 
+  /**
+   * Origens de navegador autorizadas.
+   *
+   * O Studio sempre precisou disso. O app do ouvinte também passa a precisar enquanto
+   * roda como web — quando virar pacote nativo, deixa de ser navegador e o CORS some
+   * do caminho. Manter as duas coisas na mesma lista evita esquecer uma delas.
+   */
   STUDIO_ORIGINS: z.string().default(''),
 
   // Vazio = modo demonstração: o código de verificação é sempre 000000 e sai no log.
@@ -52,7 +59,7 @@ export const env = resultado.data
 
 export const ehDesenvolvimento = env.NODE_ENV === 'development'
 
-/** Origens autorizadas a chamar a API a partir do navegador (o Studio). */
+/** Origens autorizadas a chamar a API a partir de um navegador. */
 export const origensStudio = env.STUDIO_ORIGINS.split(',')
   .map((o) => o.trim())
   .filter(Boolean)
