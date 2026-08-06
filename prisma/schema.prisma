@@ -603,6 +603,10 @@ model Conversa {
   categoria      String? // "promocao" | "pedido_musical" | "reclamacao" | ...
   ultimaMensagemEm DateTime?
 
+  /// Até quando a produção já leu. O que chegou depois disso é o que está esperando
+  /// resposta — é o número que aparece no menu do Studio o turno inteiro.
+  lidaPelaRadioEm DateTime?
+
   mensagens Mensagem[]
 
   @@index([emissoraId, ultimaMensagemEm])

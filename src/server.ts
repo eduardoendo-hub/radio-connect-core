@@ -9,6 +9,7 @@ import { rotasAuth } from './modules/auth/rotas.js'
 import { rotasNoAr } from './modules/noar/rotas.js'
 import { rotasMomentos } from './modules/momentos/rotas.js'
 import { rotasStudio } from './modules/studio/rotas.js'
+import { rotasChat, rotasChatStudio } from './modules/chat/rotas.js'
 import { iniciarAgendador, pararAgendador } from './modules/noar/agendador.js'
 
 const app = express()
@@ -75,6 +76,9 @@ v1.use(exigirEmissora())
 v1.use('/auth', rotasAuth)
 v1.use('/no-ar', rotasNoAr)
 v1.use('/momentos', rotasMomentos)
+v1.use('/conversa', rotasChat)
+// As rotas de chat da produção moram sob /studio junto com o resto da operação.
+v1.use('/studio', rotasChatStudio)
 v1.use('/studio', rotasStudio)
 
 app.use('/v1', v1)

@@ -61,14 +61,26 @@ rotasStudio.get('/hoje', exigirOperador(), async (req, res, next) => {
 
     const aoVivo = edicoes.find((e) => e.inicioEm <= agora && e.fimEm >= agora) ?? null
 
-    const [momentosAgendados, promocoesAtivas] = await Promise.all([
+    const [momentosAgendados, promocoesAtivas, naoLidas] = await Promise.all([
       prisma.momento.count({ where: { estado: { in: ['AGENDADO', 'PRONTO'] }, inicioEm: { gte: agora } } }),
       prisma.promocao.count({ where: { inicioEm: { lte: agora }, fimEm: { gte: agora } } }),
+      // Conversas esperando resposta. O menu do Studio mostra esse número de qualquer
+      // tela: quem está operando o ao vivo não deixa de saber que tem ouvinte na fila.
+      prisma.conversa.count({
+        where: {
+          ultimaMensagemEm: { not: null },
+          OR: [
+            { lidaPelaRadioEm: null },
+            { lidaPelaRadioEm: { lt: prisma.conversa.fields.ultimaMensagemEm } },
+          ],
+        },
+      }),
     ])
 
     res.json({
       edicoes,
       aoVivoId: aoVivo?.id ?? null,
+      naoLidas,
       resumo: { programas: edicoes.length, momentosAgendados, promocoesAtivas },
     })
   } catch (e) {
