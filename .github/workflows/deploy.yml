@@ -1,0 +1,33 @@
+name: Deploy para o Coolify
+
+# A cada push na main, dispara o deploy da app radio-connect-core no Coolify.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Tipos
+        run: npm run lint
+      - name: Testes
+        run: npm test
+
+  deploy:
+    needs: verificar
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar deploy no Coolify
+        run: |
+          curl -fsS -X GET \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
+            "${{ secrets.COOLIFY_DEPLOY_URL }}"

@@ -1,0 +1,704 @@
+// Radio Connect — núcleo da plataforma
+//
+// Regra que atravessa todo este schema:
+//   TODA entidade pertence a exatamente uma Emissora (tenant). Sem exceção.
+//   Nenhuma consulta cruza tenants. Nunca.
+//
+// Ver docs/03-arquitetura/01-modelo-conceitual.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// EMISSORA — a raiz de tudo
+// ─────────────────────────────────────────────────────────────
+
+model Emissora {
+  id        String   @id @default(cuid())
+  slug      String   @unique // "bandfm" — usado em subdomínio e no header X-Tenant
+  nome      String
+  ativa     Boolean  @default(true)
+  celula    String   @default("c1") // arquitetura celular: qual célula atende esta rádio
+  criadaEm  DateTime @default(now())
+
+  // Streaming: a emissora fornece o m3u8. Não hospedamos áudio.
+  streamUrl       String?
+  streamBackupUrl String?
+
+  // As três camadas de configuração, com ciclos de vida diferentes.
+  // Ver docs/03-arquitetura/02-visao-geral.md §7
+  configuracao Json @default("{}") // módulos ligados, durações, tetos de anúncio
+  tema         Json @default("{}") // cores, logo, tipografia, intensidade do pulso
+  conteudo     Json @default("{}") // textos da interface, tom de voz (com fallback)
+
+  programas     Programa[]
+  locutores     Locutor[]
+  slots         SlotGrade[]
+  edicoes       Edicao[]
+  momentos      Momento[]
+  templates     TemplateMomento[]
+  ouvintes      Ouvinte[]
+  operadores    Operador[]
+  promocoes     Promocao[]
+  pushes        Push[]
+  anunciantes   Anunciante[]
+  campanhas     Campanha[]
+  conversas     Conversa[]
+  eventos       Evento[]
+  impressoes    ImpressaoAnuncio[]
+  beneficios    Beneficio[]
+
+  @@map("emissoras")
+}
+
+// ─────────────────────────────────────────────────────────────
+// PROGRAMAÇÃO — Programa → Slot de Grade → Edição
+// ─────────────────────────────────────────────────────────────
+
+/// O conceito. "Bom Dia Band" existe mesmo no domingo, quando não vai ao ar.
+model Programa {
+  id         String @id @default(cuid())
+  emissoraId String
+  emissora   Emissora @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+
+  nome        String
+  descricao   String?
+  imagemUrl   String?
+  corDestaque String?
+  tomDeVoz    String? // "descontraído" | "sóbrio" — orienta os textos dos Momentos
+
+  locutorTitularId String?
+  locutorTitular   Locutor? @relation(fields: [locutorTitularId], references: [id])
+
+  // Programa Patrocinado: assina o No Ar durante as edições deste programa
+  campanhaPatrocinadoraId String?
+  campanhaPatrocinadora   Campanha? @relation("ProgramaPatrocinado", fields: [campanhaPatrocinadoraId], references: [id])
+
+  ativo    Boolean     @default(true)
+  criadoEm DateTime    @default(now())
+  slots    SlotGrade[]
+  edicoes  Edicao[]
+
+  @@index([emissoraId, ativo])
+  @@map("programas")
+}
+
+model Locutor {
+  id         String   @id @default(cuid())
+  emissoraId String
+  emissora   Emissora @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+
+  nome      String
+  imagemUrl String?
+  bio       String?
+  ativo     Boolean @default(true)
+
+  programas Programa[]
+  edicoes   Edicao[]
+
+  @@index([emissoraId])
+  @@map("locutores")
+}
+
+/// A recorrência. "Bom Dia Band, de segunda a sexta, das 6h às 10h."
+model SlotGrade {
+  id         String   @id @default(cuid())
+  emissoraId String
+  emissora   Emissora @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+  programaId String
+  programa   Programa @relation(fields: [programaId], references: [id], onDelete: Cascade)
+
+  diaSemana  Int // 0 = domingo
+  horaInicio String // "06:00"
+  horaFim    String // "10:00"
+  ativo      Boolean @default(true)
+
+  edicoes Edicao[]
+
+  @@index([emissoraId, diaSemana])
+  @@map("slots_grade")
+}
+
+/// A ocorrência concreta. "O Bom Dia Band de 5 de agosto, com Marcelo."
+/// É a entidade à qual Momentos, mensagens e analytics se ligam.
+model Edicao {
+  id         String   @id @default(cuid())
+  emissoraId String
+  emissora   Emissora @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+  programaId String
+  programa   Programa @relation(fields: [programaId], references: [id], onDelete: Cascade)
+
+  /// Nulo em edição especial: cobertura de jogo, eleição, show.
+  slotId String?
+  slot   SlotGrade? @relation(fields: [slotId], references: [id])
+
+  inicioEm DateTime
+  fimEm    DateTime
+
+  /// Quem apresentou de fato — pode diferir do titular do programa.
+  locutorId String?
+  locutor   Locutor? @relation(fields: [locutorId], references: [id])
+
+  titulo   String? // sobrescreve o nome do programa em edição especial
+  criadaEm DateTime @default(now())
+
+  momentos  Momento[]
+  mensagens Mensagem[]
+
+  @@index([emissoraId, inicioEm])
+  @@map("edicoes")
+}
+
+// ─────────────────────────────────────────────────────────────
+// MOMENTO — o átomo
+// ─────────────────────────────────────────────────────────────
+
+enum TipoMomento {
+  REACAO
+  ESCOLHA
+  ENQUETE
+  AVISO
+  CHAMADA_PROMOCAO
+  RESULTADO
+}
+
+enum EstadoMomento {
+  RASCUNHO
+  AGENDADO
+  PRONTO
+  ATIVO
+  ENCERRADO
+  RESULTADO_PUBLICADO
+  ARQUIVADO
+}
+
+model Momento {
+  id         String   @id @default(cuid())
+  emissoraId String
+  emissora   Emissora @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+  edicaoId   String
+  edicao     Edicao   @relation(fields: [edicaoId], references: [id], onDelete: Cascade)
+
+  tipo   TipoMomento
+  estado EstadoMomento @default(RASCUNHO)
+
+  titulo             String
+  texto              String?
+  imagemUrl          String?
+  mensagemPosResposta String?
+
+  /// Janela ampla, de propósito: absorve o delay entre FM e streaming.
+  /// Ver DP-24. Nunca sincronizamos áudio, só estado.
+  inicioEm DateTime
+  fimEm    DateTime
+
+  /// Específico do tipo. O núcleo é rígido; o que varia mora aqui.
+  config Json @default("{}")
+
+  templateId String?
+  template   TemplateMomento? @relation(fields: [templateId], references: [id])
+
+  /// Momento Patrocinado
+  campanhaPatrocinadoraId String?
+  campanhaPatrocinadora   Campanha? @relation("MomentoPatrocinado", fields: [campanhaPatrocinadoraId], references: [id])
+
+  promocaoId String?
+  promocao   Promocao? @relation(fields: [promocaoId], references: [id])
+
+  criadoPorId String?
+  criadoPor   Operador? @relation(fields: [criadoPorId], references: [id])
+  criadoEm    DateTime  @default(now())
+
+  opcoes    OpcaoMomento[]
+  respostas RespostaMomento[]
+
+  @@index([emissoraId, estado, inicioEm])
+  @@index([edicaoId])
+  @@map("momentos")
+}
+
+model OpcaoMomento {
+  id        String  @id @default(cuid())
+  momentoId String
+  momento   Momento @relation(fields: [momentoId], references: [id], onDelete: Cascade)
+
+  ordem  Int
+  rotulo String
+  emoji  String?
+
+  /// Desnormalizado de propósito: contagem ao vivo vem daqui, nunca de COUNT(*).
+  /// O valor autoritativo é agregado a partir das respostas.
+  votos Int @default(0)
+
+  respostas RespostaMomento[]
+
+  @@unique([momentoId, ordem])
+  @@map("opcoes_momento")
+}
+
+/// Uma participação por ouvinte por momento — regra estrutural, não validação.
+/// É o que implementa "impedir votos duplicados".
+model RespostaMomento {
+  id        String  @id @default(cuid())
+  momentoId String
+  momento   Momento @relation(fields: [momentoId], references: [id], onDelete: Cascade)
+  ouvinteId String
+  ouvinte   Ouvinte @relation(fields: [ouvinteId], references: [id], onDelete: Cascade)
+
+  opcaoId String?
+  opcao   OpcaoMomento? @relation(fields: [opcaoId], references: [id])
+
+  /// Gerada no cliente. Permite reenviar em rede ruim sem duplicar.
+  chaveIdempotencia String? @unique
+
+  respondidoEm DateTime @default(now())
+
+  @@unique([momentoId, ouvinteId])
+  @@index([ouvinteId])
+  @@map("respostas_momento")
+}
+
+/// Sustenta a meta de criar um Momento em menos de 20 segundos, e alimenta a Biblioteca.
+model TemplateMomento {
+  id         String   @id @default(cuid())
+  emissoraId String
+  emissora   Emissora @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+
+  nome            String
+  tipo            TipoMomento
+  titulo          String
+  texto           String?
+  opcoesPadrao    Json    @default("[]")
+  duracaoSegundos Int     @default(180)
+  favorito        Boolean @default(false)
+
+  momentos Momento[]
+
+  @@index([emissoraId])
+  @@map("templates_momento")
+}
+
+// ─────────────────────────────────────────────────────────────
+// OUVINTE — a relação com a emissora. Não existe identidade global.
+// ─────────────────────────────────────────────────────────────
+
+model Ouvinte {
+  id         String   @id @default(cuid())
+  emissoraId String
+  emissora   Emissora @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+
+  /// Cadastro obrigatório desde a entrada (DP-31). Um toque: telefone, Google ou Apple.
+  telefone String?
+  email    String?
+  nome     String?
+  cidade   String?
+  avatarUrl String?
+
+  provedorAuth String? // "telefone" | "google" | "apple"
+  idExterno    String?
+
+  /// Dados adicionais pedidos progressivamente, dentro da experiência.
+  preferencias Json @default("{}")
+
+  consentimentoAnuncios Boolean   @default(false)
+  consentimentoEm       DateTime?
+
+  criadoEm    DateTime @default(now())
+  ultimoAcesso DateTime?
+
+  respostas       RespostaMomento[]
+  conversa        Conversa?
+  snapshots       SnapshotConexao[]
+  reconhecimentos Reconhecimento[]
+  beneficios      BeneficioConcedido[]
+  participacoes   ParticipacaoPromocao[]
+  eventos         Evento[]
+
+  @@unique([emissoraId, telefone])
+  @@unique([emissoraId, idExterno])
+  @@index([emissoraId, ultimoAcesso])
+  @@map("ouvintes")
+}
+
+/// O Índice de Conexão é uma SÉRIE, não um campo do ouvinte.
+/// "Sua conexão cresceu esta semana" exige o valor de antes e os componentes.
+model SnapshotConexao {
+  id        String  @id @default(cuid())
+  ouvinteId String
+  ouvinte   Ouvinte @relation(fields: [ouvinteId], references: [id], onDelete: Cascade)
+
+  data  DateTime @db.Date
+  score Int
+  nivel String // nome configurado pela emissora
+
+  /// presença · participação · relacionamento · constância
+  componentes Json @default("{}")
+
+  @@unique([ouvinteId, data])
+  @@index([ouvinteId, data])
+  @@map("snapshots_conexao")
+}
+
+/// "Reconhecimentos", nunca "gamificação" (DP-16). Marco datado, para compor a jornada.
+model Reconhecimento {
+  id        String  @id @default(cuid())
+  ouvinteId String
+  ouvinte   Ouvinte @relation(fields: [ouvinteId], references: [id], onDelete: Cascade)
+
+  chave     String // "primeira_participacao" | "um_ano" | "cem_momentos"
+  titulo    String
+  obtidoEm  DateTime @default(now())
+
+  @@unique([ouvinteId, chave])
+  @@map("reconhecimentos")
+}
+
+model Beneficio {
+  id         String   @id @default(cuid())
+  emissoraId String
+  emissora   Emissora @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+
+  titulo    String
+  descricao String?
+  /// Benefício de Parceiro: marca compra acesso ao público mais conectado
+  campanhaParceiraId String?
+  campanhaParceira   Campanha? @relation("BeneficioParceiro", fields: [campanhaParceiraId], references: [id])
+
+  scoreMinimo Int     @default(0)
+  ativo       Boolean @default(true)
+
+  concessoes BeneficioConcedido[]
+
+  @@index([emissoraId, ativo])
+  @@map("beneficios")
+}
+
+model BeneficioConcedido {
+  id          String    @id @default(cuid())
+  beneficioId String
+  beneficio   Beneficio @relation(fields: [beneficioId], references: [id], onDelete: Cascade)
+  ouvinteId   String
+  ouvinte     Ouvinte   @relation(fields: [ouvinteId], references: [id], onDelete: Cascade)
+
+  concedidoEm DateTime  @default(now())
+  usadoEm     DateTime?
+
+  @@unique([beneficioId, ouvinteId])
+  @@map("beneficios_concedidos")
+}
+
+// ─────────────────────────────────────────────────────────────
+// PROMOÇÃO — entidade própria, não um tipo de Momento
+// ─────────────────────────────────────────────────────────────
+
+model Promocao {
+  id         String   @id @default(cuid())
+  emissoraId String
+  emissora   Emissora @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+
+  titulo    String
+  descricao String?
+  regras    String?
+  imagemUrl String?
+
+  inicioEm DateTime
+  fimEm    DateTime
+
+  /// Elegibilidade opcional por Índice de Conexão (DP-19)
+  scoreMinimo Int?
+
+  /// Promoção Patrocinada — o formato de maior valor
+  campanhaPatrocinadoraId String?
+  campanhaPatrocinadora   Campanha? @relation("PromocaoPatrocinada", fields: [campanhaPatrocinadoraId], references: [id])
+
+  resultado String?
+  criadaEm  DateTime @default(now())
+
+  momentos      Momento[]
+  participacoes ParticipacaoPromocao[]
+
+  @@index([emissoraId, inicioEm])
+  @@map("promocoes")
+}
+
+model ParticipacaoPromocao {
+  id         String   @id @default(cuid())
+  promocaoId String
+  promocao   Promocao @relation(fields: [promocaoId], references: [id], onDelete: Cascade)
+  ouvinteId  String
+  ouvinte    Ouvinte  @relation(fields: [ouvinteId], references: [id], onDelete: Cascade)
+
+  participouEm DateTime @default(now())
+  vencedor     Boolean  @default(false)
+
+  @@unique([promocaoId, ouvinteId])
+  @@map("participacoes_promocao")
+}
+
+// ─────────────────────────────────────────────────────────────
+// PUSH — irmão do Momento, não filho
+// ─────────────────────────────────────────────────────────────
+
+model Push {
+  id         String   @id @default(cuid())
+  emissoraId String
+  emissora   Emissora @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+
+  titulo    String
+  corpo     String
+  segmento  Json     @default("{}")
+  agendadoEm DateTime?
+  enviadoEm  DateTime?
+
+  /// Push Patrocinado — teto rígido: no máximo 1 por semana por ouvinte
+  campanhaPatrocinadoraId String?
+  campanhaPatrocinadora   Campanha? @relation("PushPatrocinado", fields: [campanhaPatrocinadoraId], references: [id])
+
+  criadoEm DateTime @default(now())
+
+  @@index([emissoraId, agendadoEm])
+  @@map("pushes")
+}
+
+// ─────────────────────────────────────────────────────────────
+// COMERCIAL — direta e programática
+// ─────────────────────────────────────────────────────────────
+
+model Anunciante {
+  id         String   @id @default(cuid())
+  emissoraId String
+  emissora   Emissora @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+
+  nome     String
+  contato  String?
+  criadoEm DateTime @default(now())
+
+  campanhas Campanha[]
+
+  @@index([emissoraId])
+  @@map("anunciantes")
+}
+
+enum VendidoPor {
+  RADIO
+  TECHNOW
+}
+
+enum StatusCampanha {
+  RASCUNHO
+  AGUARDANDO_APROVACAO
+  APROVADA
+  ATIVA
+  ENCERRADA
+  REJEITADA
+}
+
+model Campanha {
+  id           String     @id @default(cuid())
+  emissoraId   String
+  emissora     Emissora   @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+  anuncianteId String
+  anunciante   Anunciante @relation(fields: [anuncianteId], references: [id], onDelete: Cascade)
+
+  nome     String
+  formato  String // "promocao_patrocinada" | "momento_patrocinado" | "preroll" | "banner" | ...
+  status   StatusCampanha @default(RASCUNHO)
+
+  inicioEm DateTime
+  fimEm    DateTime
+
+  /// Quem vendeu define o revenue share: RADIO = 70/30, TECHNOW = 100%
+  vendidoPor VendidoPor @default(RADIO)
+  valorTotal Decimal?   @db.Decimal(12, 2)
+
+  /// Preço mínimo validado no cadastro. Impede venda direta barata
+  /// deslocar programática mais valiosa. Ver DP-40.
+  cpmMinimo Decimal? @db.Decimal(10, 2)
+
+  criativos  Criativo[]
+  impressoes ImpressaoAnuncio[]
+
+  momentosPatrocinados  Momento[]   @relation("MomentoPatrocinado")
+  promocoesPatrocinadas Promocao[]  @relation("PromocaoPatrocinada")
+  programasPatrocinados Programa[]  @relation("ProgramaPatrocinado")
+  pushesPatrocinados    Push[]      @relation("PushPatrocinado")
+  beneficiosParceiros   Beneficio[] @relation("BeneficioParceiro")
+
+  criadaEm DateTime @default(now())
+
+  @@index([emissoraId, status, inicioEm])
+  @@map("campanhas")
+}
+
+model Criativo {
+  id         String   @id @default(cuid())
+  campanhaId String
+  campanha   Campanha @relation(fields: [campanhaId], references: [id], onDelete: Cascade)
+
+  tipo      String // "imagem" | "audio" | "nativo"
+  url       String
+  clickUrl  String?
+  duracao   Int? // segundos, para áudio
+  posicoes  Json   @default("[]") // onde este criativo pode aparecer
+
+  @@index([campanhaId])
+  @@map("criativos")
+}
+
+enum OrigemAnuncio {
+  DIRETA
+  PROGRAMATICA
+}
+
+/// Sem origem em cada impressão não existe cálculo de revenue share —
+/// e o extrato vira discussão todo mês com cada emissora.
+model ImpressaoAnuncio {
+  id         String   @id @default(cuid())
+  emissoraId String
+  emissora   Emissora @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+
+  posicao String // "no_ar_banner" | "chat_inline" | "preroll" | ...
+  origem  OrigemAnuncio
+  vendidoPor VendidoPor
+
+  campanhaId String?
+  campanha   Campanha? @relation(fields: [campanhaId], references: [id])
+
+  ouvinteId String?
+  edicaoId  String?
+
+  visivel   Boolean @default(false)
+  clicado   Boolean @default(false)
+  concluido Boolean @default(false) // pré-roll ouvido até o fim
+
+  ocorridaEm DateTime @default(now())
+
+  @@index([emissoraId, ocorridaEm])
+  @@index([campanhaId])
+  @@map("impressoes_anuncio")
+}
+
+// ─────────────────────────────────────────────────────────────
+// CONVERSA — referência ao Chatwoot (um Account por emissora)
+// ─────────────────────────────────────────────────────────────
+
+model Conversa {
+  id         String   @id @default(cuid())
+  emissoraId String
+  emissora   Emissora @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+  ouvinteId  String   @unique
+  ouvinte    Ouvinte  @relation(fields: [ouvinteId], references: [id], onDelete: Cascade)
+
+  /// Identificadores no Chatwoot. A conversa vive lá; aqui guardamos o vínculo.
+  chatwootContactId      String?
+  chatwootConversationId String?
+  chatwootSourceId       String?
+
+  categoria      String? // "promocao" | "pedido_musical" | "reclamacao" | ...
+  ultimaMensagemEm DateTime?
+
+  mensagens Mensagem[]
+
+  @@index([emissoraId, ultimaMensagemEm])
+  @@map("conversas")
+}
+
+/// Espelho local do essencial. O vínculo com a Edição é o que permite ao produtor
+/// filtrar "todas as mensagens do programa que está no ar".
+model Mensagem {
+  id         String   @id @default(cuid())
+  conversaId String
+  conversa   Conversa @relation(fields: [conversaId], references: [id], onDelete: Cascade)
+
+  emissoraId String
+  direcao    String // "ouvinte_para_radio" | "radio_para_ouvinte"
+  tipo       String // "texto" | "audio" | "imagem"
+  conteudo   String?
+  midiaUrl   String?
+
+  /// A Edição em que a mensagem nasceu.
+  edicaoId String?
+  edicao   Edicao? @relation(fields: [edicaoId], references: [id])
+
+  chatwootMessageId String?
+  enviadaEm         DateTime @default(now())
+
+  @@index([conversaId, enviadaEm])
+  @@index([emissoraId, edicaoId])
+  @@map("mensagens")
+}
+
+// ─────────────────────────────────────────────────────────────
+// STUDIO — operadores e permissões
+// ─────────────────────────────────────────────────────────────
+
+enum PapelOperador {
+  ADMIN // vê tudo, inclusive audiência ao vivo
+  DIRETOR // indicadores, campanhas, usuários
+  PRODUTOR // opera tudo do dia a dia
+  PROGRAMACAO // grade, programas, locutores — sem comercial
+  LOCUTOR // vê o ao vivo do programa dele
+  MARKETING // campanhas, promoções, push
+  ATENDIMENTO // chat e promoções
+  VISUALIZADOR // só leitura
+}
+
+model Operador {
+  id         String   @id @default(cuid())
+  emissoraId String
+  emissora   Emissora @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+
+  nome       String
+  email      String
+  senhaHash  String
+  papel      PapelOperador @default(PRODUTOR)
+  ativo      Boolean       @default(true)
+  ultimoLogin DateTime?
+  criadoEm   DateTime      @default(now())
+
+  momentosCriados Momento[]
+
+  @@unique([emissoraId, email])
+  @@index([emissoraId])
+  @@map("operadores")
+}
+
+// ─────────────────────────────────────────────────────────────
+// EVENTO — telemetria assíncrona. Nunca gravado dentro da requisição.
+// ─────────────────────────────────────────────────────────────
+
+model Evento {
+  id         String   @id @default(cuid())
+  emissoraId String
+  emissora   Emissora @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+
+  nome String // "no_ar_viewed" | "moment_answered" | "ad_impression" | ...
+
+  ouvinteId String?
+  ouvinte   Ouvinte? @relation(fields: [ouvinteId], references: [id])
+
+  edicaoId  String?
+  momentoId String?
+
+  payload Json @default("{}")
+
+  /// Relógio de celular mente: guardamos os dois.
+  ocorridoEmCliente  DateTime?
+  ocorridoEmServidor DateTime @default(now())
+
+  /// Gerado no cliente — deduplica reenvio em rede ruim.
+  chaveIdempotencia String? @unique
+
+  appVersao String?
+  plataforma String?
+
+  @@index([emissoraId, nome, ocorridoEmServidor])
+  @@index([ouvinteId])
+  @@map("eventos")
+}
