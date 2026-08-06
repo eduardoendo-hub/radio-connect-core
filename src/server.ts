@@ -4,6 +4,11 @@ import { log } from './lib/log.js'
 import { conectarBanco, desconectarBanco, prismaSemEscopo } from './lib/prisma.js'
 import { redis, desconectarRedis } from './lib/redis.js'
 import { rotaNaoEncontrada, tratarErros } from './middleware/erros.js'
+import { exigirEmissora } from './middleware/tenant.js'
+import { rotasAuth } from './modules/auth/rotas.js'
+import { rotasNoAr } from './modules/noar/rotas.js'
+import { rotasMomentos } from './modules/momentos/rotas.js'
+import { rotasStudio } from './modules/studio/rotas.js'
 
 const app = express()
 
@@ -60,6 +65,15 @@ app.get('/saude', async (_req, res) => {
  */
 const v1 = express.Router()
 v1.get('/', (_req, res) => res.json({ versao: 'v1', servico: 'radio-connect-core' }))
+
+// Tudo abaixo pertence a uma emissora. O middleware resolve o tenant e prende a
+// requisição inteira ao escopo dele — nenhuma consulta consegue ver outra rádio.
+v1.use(exigirEmissora())
+v1.use('/auth', rotasAuth)
+v1.use('/no-ar', rotasNoAr)
+v1.use('/momentos', rotasMomentos)
+v1.use('/studio', rotasStudio)
+
 app.use('/v1', v1)
 
 app.use(rotaNaoEncontrada)

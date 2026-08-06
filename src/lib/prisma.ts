@@ -15,6 +15,11 @@ import { MODELOS_ESCOPADOS } from './modelos-escopados.js'
  *
  * O `emissoraId` viaja pelo contexto assíncrono da requisição — quem chama o Prisma não
  * precisa saber que isso existe.
+ *
+ * NOTA SOBRE `create`: os tipos gerados pelo Prisma exigem `emissoraId` em tempo de
+ * compilação, então nas criações ele é escrito à mão. Isso não enfraquece o isolamento:
+ * a extensão sobrescreve o valor com o do contexto, de modo que um id errado nunca chega
+ * ao banco. Leituras, atualizações e exclusões continuam escopadas sozinhas.
  */
 
 type ContextoEmissora = { emissoraId: string }
