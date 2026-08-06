@@ -16,7 +16,10 @@ function soDigitos(t: string) {
 }
 
 const pedirCodigo = z.object({
-  telefone: z.string().min(10).max(20),
+  // Aceita qualquer coisa aqui de propósito: a checagem do tamanho acontece depois
+  // de tirar máscara e espaços, e com uma mensagem que a pessoa entende — não com
+  // o texto de validação genérico.
+  telefone: z.string().max(30),
 })
 
 /**
@@ -68,7 +71,7 @@ rotasAuth.post('/codigo', async (req, res, next) => {
 })
 
 const entrar = z.object({
-  telefone: z.string().min(10).max(20),
+  telefone: z.string().max(30),
   codigo: z.string().length(6),
   nome: z.string().min(1).max(80).optional(),
 })
