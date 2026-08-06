@@ -105,16 +105,28 @@ rotasMomentos.get('/:id/resultado', exigirOuvinte(), async (req, res, next) => {
     })
     if (!momento) throw erros.naoEncontrado('Momento')
 
-    const opcoes = await prisma.opcaoMomento.findMany({
-      where: { momentoId: momento.id },
-      orderBy: { ordem: 'asc' },
-      select: { id: true, rotulo: true, emoji: true, votos: true },
-    })
-    const total = opcoes.reduce((s, o) => s + o.votos, 0)
+    const s = req.sessao as { ouvinteId: string }
+    const [opcoes, minha] = await Promise.all([
+      prisma.opcaoMomento.findMany({
+        where: { momentoId: momento.id },
+        orderBy: { ordem: 'asc' },
+        select: { id: true, rotulo: true, emoji: true, votos: true },
+      }),
+      // O Estado No Ar é o mesmo para toda a emissora — é o que permite guardá-lo em
+      // cache e responder 304. Por isso a resposta de cada pessoa não pode morar lá:
+      // ela vem daqui, na consulta que o cartão já faz quando abre.
+      prisma.respostaMomento.findFirst({
+        where: { momentoId: momento.id, ouvinteId: s.ouvinteId },
+        select: { opcaoId: true },
+      }),
+    ])
+    const total = opcoes.reduce((sum, o) => sum + o.votos, 0)
 
     res.json({
       momento,
       total,
+      respondi: !!minha,
+      minhaOpcaoId: minha?.opcaoId ?? null,
       opcoes: opcoes.map((o) => ({ ...o, percentual: total ? Math.round((o.votos / total) * 100) : 0 })),
     })
   } catch (e) {
@@ -131,6 +143,7 @@ rotasMomentos.get('/:id/resultado', exigirOuvinte(), async (req, res, next) => {
  */
 rotasMomentos.get('/', exigirOuvinte(), async (req, res, next) => {
   try {
+    const s = req.sessao as { ouvinteId: string }
     const desde = new Date(Date.now() - 24 * 60 * 60 * 1000)
     const momentos = await prisma.momento.findMany({
       where: { estado: { in: ['ATIVO', 'ENCERRADO', 'RESULTADO_PUBLICADO'] }, inicioEm: { gte: desde } },
@@ -138,7 +151,27 @@ rotasMomentos.get('/', exigirOuvinte(), async (req, res, next) => {
       take: 20,
       include: { opcoes: { orderBy: { ordem: 'asc' }, select: { id: true, rotulo: true, emoji: true, votos: true } } },
     })
-    res.json({ momentos })
+
+    // O que esta pessoa já respondeu. Sem isso o app não tem como lembrar da própria
+    // participação: quem votou pelo No Ar chegava na aba Momentos e via o mesmo
+    // convite de novo, como se nada tivesse acontecido. Participação sem memória não
+    // é conexão — é formulário.
+    // RespostaMomento é filho, não carrega `emissoraId` e por isso não é escopada
+    // automaticamente. Aqui não há brecha: os momentos já vieram filtrados pela
+    // emissora do contexto e o ouvinte é o da sessão.
+    const minhas = await prisma.respostaMomento.findMany({
+      where: { momentoId: { in: momentos.map((m) => m.id) }, ouvinteId: s.ouvinteId },
+      select: { momentoId: true, opcaoId: true },
+    })
+    const porMomento = new Map(minhas.map((r) => [r.momentoId, r.opcaoId]))
+
+    res.json({
+      momentos: momentos.map((m) => ({
+        ...m,
+        respondi: porMomento.has(m.id),
+        minhaOpcaoId: porMomento.get(m.id) ?? null,
+      })),
+    })
   } catch (e) {
     next(e)
   }
