@@ -335,6 +335,16 @@ async function main() {
       favorito: false,
     },
     {
+      // O Fofocômetro entra como template para virar botão no Studio. O conteúdo é
+      // sempre novo — o que o template guarda é o formato, não a fofoca.
+      nome: 'Fofocômetro',
+      tipo: 'FOFOCOMETRO' as const,
+      titulo: 'Você quer saber quem foi visto aos beijos?',
+      opcoesPadrao: [],
+      duracaoSegundos: 600,
+      favorito: true,
+    },
+    {
       nome: 'Chamada de promoção',
       tipo: 'CHAMADA_PROMOCAO' as const,
       titulo: 'Promoção no ar. Participe!',

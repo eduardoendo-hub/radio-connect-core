@@ -3,9 +3,10 @@ import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma.js'
 import { redis, chaves } from '../../lib/redis.js'
-import { erros } from '../../lib/erros.js'
+import { erros, ErroDaApi } from '../../lib/erros.js'
 import { exigirOuvinte } from '../../middleware/sessao.js'
 import { recalcular } from '../noar/servico.js'
+import { jaRevelou, type ConfigFofocometro } from './fofocometro.js'
 
 export const rotasMomentos = Router()
 
@@ -171,6 +172,46 @@ rotasMomentos.get('/', exigirOuvinte(), async (req, res, next) => {
         respondi: porMomento.has(m.id),
         minhaOpcaoId: porMomento.get(m.id) ?? null,
       })),
+    })
+  } catch (e) {
+    next(e)
+  }
+})
+
+/**
+ * A revelação do Fofocômetro.
+ *
+ * Rota própria, e não um campo do Estado No Ar, por dois motivos que se somam: o No Ar
+ * é o mesmo para toda a emissora e fica em cache — o que trafegasse por ele estaria
+ * disponível para qualquer pessoa antes da hora —, e o recálculo dele acontece a cada
+ * quinze segundos, atraso que estragaria a precisão de um formato que vive do instante
+ * da abertura.
+ *
+ * Assim o aplicativo conta o tempo sozinho e bate aqui quando o relógio zera. Quem
+ * tentar antes leva 425 e mais nada: a checagem é do servidor, sempre.
+ */
+rotasMomentos.get('/:id/revelacao', exigirOuvinte(), async (req, res, next) => {
+  try {
+    const momento = await prisma.momento.findFirst({
+      where: { id: req.params.id, tipo: 'FOFOCOMETRO' },
+      select: { id: true, tipo: true, titulo: true, config: true },
+    })
+    if (!momento) throw erros.naoEncontrado('Fofocômetro')
+
+    if (!jaRevelou(momento.config)) {
+      const c = momento.config as { revelarEm?: string } | null
+      throw new ErroDaApi(425, 'ainda_nao', 'Ainda não deu a hora.', {
+        revelarEm: c?.revelarEm ?? null,
+      })
+    }
+
+    const c = momento.config as ConfigFofocometro
+    res.json({
+      momentoId: momento.id,
+      titulo: momento.titulo,
+      revelacao: c.revelacao,
+      // `fonte` fica fora de propósito: é rastro editorial para a emissora se defender,
+      // não conteúdo para publicar.
     })
   } catch (e) {
     next(e)

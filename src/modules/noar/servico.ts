@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma.js'
+import { ehFofocometro, jaRevelou } from '../momentos/fofocometro.js'
 import { redis, redisPub, chaves } from '../../lib/redis.js'
 import { env } from '../../lib/env.js'
 
@@ -33,6 +34,11 @@ export type EstadoNoAr = {
     terminaEm: string
     opcoes: { id: string; rotulo: string; emoji: string | null }[]
     patrocinada: boolean
+    /// Só no Fofocômetro. A revelação **não** vem aqui: o Estado No Ar é o mesmo para
+    /// toda a emissora e fica em cache, então o que trafegasse por ele estaria
+    /// disponível para qualquer um antes da hora. Aqui vai só o instante da abertura —
+    /// o aplicativo conta o tempo e busca a revelação quando ele zera.
+    fofoca: { revelarEm: string | null; revelado: boolean } | null
   } | null
   promocao: { id: string; titulo: string; imagemUrl: string | null } | null
   proxima: { nome: string; comeca: string } | null
@@ -107,6 +113,12 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
           terminaEm: momento.fimEm.toISOString(),
           opcoes: momento.opcoes,
           patrocinada: Boolean(momento.campanhaPatrocinadoraId),
+          fofoca: ehFofocometro(momento.tipo)
+            ? {
+                revelarEm: (momento.config as { revelarEm?: string } | null)?.revelarEm ?? null,
+                revelado: jaRevelou(momento.config, agora),
+              }
+            : null,
         }
       : null,
     promocao: promocao ?? null,

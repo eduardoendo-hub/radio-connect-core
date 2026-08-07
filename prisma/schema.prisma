@@ -179,6 +179,17 @@ enum TipoMomento {
   AVISO
   CHAMADA_PROMOCAO
   RESULTADO
+
+  /// Fofocômetro: gancho agora, revelação com hora marcada.
+  ///
+  /// É o primeiro formato que pede **espera** em vez de resposta — o "depois do
+  /// intervalo a gente conta" da rádio, trazido para o digital. O gancho fica na tela
+  /// com o relógio correndo; quando o tempo acaba, o texto e a foto aparecem embaixo.
+  ///
+  /// A revelação mora em `config.revelacao` e **o servidor só a inclui na resposta
+  /// depois da hora**. Mandar tudo e esconder no aplicativo seria entregar a fofoca
+  /// para quem abrisse o JSON — e o formato inteiro depende de ninguém saber antes.
+  FOFOCOMETRO
 }
 
 enum EstadoMomento {

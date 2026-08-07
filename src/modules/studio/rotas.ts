@@ -7,6 +7,7 @@ import { env } from '../../lib/env.js'
 import { erros, ErroDaApi } from '../../lib/erros.js'
 import { exigirOperador } from '../../middleware/sessao.js'
 import { recalcular } from '../noar/servico.js'
+import { conferirAntesDePublicar } from '../momentos/fofocometro.js'
 
 export const rotasStudio = Router()
 
@@ -145,7 +146,7 @@ rotasStudio.get('/templates', exigirOperador(), async (req, res, next) => {
 
 const criarMomento = z.object({
   edicaoId: z.string(),
-  tipo: z.enum(['REACAO', 'ESCOLHA', 'ENQUETE', 'AVISO', 'CHAMADA_PROMOCAO', 'RESULTADO']),
+  tipo: z.enum(['REACAO', 'ESCOLHA', 'ENQUETE', 'AVISO', 'CHAMADA_PROMOCAO', 'RESULTADO', 'FOFOCOMETRO']),
   titulo: z.string().min(1).max(120),
   texto: z.string().max(500).optional(),
   opcoes: z.array(z.object({ rotulo: z.string().min(1).max(60), emoji: z.string().max(8).optional() })).max(6).optional(),
@@ -154,6 +155,18 @@ const criarMomento = z.object({
   templateId: z.string().optional(),
   campanhaPatrocinadoraId: z.string().optional(),
   promocaoId: z.string().optional(),
+
+  /// Só no Fofocômetro: o que vai ser revelado e quando.
+  fofoca: z
+    .object({
+      revelarEm: z.string(),
+      revelacao: z.object({
+        texto: z.string().min(1).max(1200),
+        imagemUrl: z.string().max(500).nullish(),
+      }),
+      fonte: z.string().max(200).nullish(),
+    })
+    .optional(),
 })
 
 rotasStudio.post('/momentos', exigirOperador('PRODUTOR', 'MARKETING', 'DIRETOR'), async (req, res, next) => {
@@ -165,6 +178,19 @@ rotasStudio.post('/momentos', exigirOperador('PRODUTOR', 'MARKETING', 'DIRETOR')
     const edicao = await prisma.edicao.findFirst({ where: { id: d.edicaoId }, select: { id: true } })
     if (!edicao) throw erros.naoEncontrado('Edição')
 
+    // O Fofocômetro não vai ao ar sem a revelação escrita.
+    //
+    // Publicar "vou contar" sem ter o quê é a receita do furo: o relógio zera e não tem
+    // nada do outro lado. E o custo de um furo não é daquele Momento — é do formato,
+    // porque ensina a audiência a não esperar o próximo. Por isso a checagem é aqui, e
+    // não um lembrete na tela que alguém pode ignorar.
+    if (d.tipo === 'FOFOCOMETRO') {
+      const problemas = conferirAntesDePublicar(d.fofoca ?? {})
+      if (problemas.length) {
+        throw new ErroDaApi(422, 'fofocometro_incompleto', problemas[0]!, problemas)
+      }
+    }
+
     const momento = await prisma.momento.create({
       data: {
         emissoraId: req.emissora!.id,
@@ -174,10 +200,19 @@ rotasStudio.post('/momentos', exigirOperador('PRODUTOR', 'MARKETING', 'DIRETOR')
         texto: d.texto ?? null,
         estado: d.publicarAgora ? 'ATIVO' : 'PRONTO',
         inicioEm: agora,
-        fimEm: new Date(agora.getTime() + d.duracaoSegundos * 1000),
+        // No Fofocômetro a duração não é escolhida pelo produtor: ela decorre da hora
+        // da revelação. Se `fimEm` caísse antes, o agendador encerraria o Momento com
+        // o gancho ainda na tela e a fofoca nunca abriria — o formato se mataria
+        // sozinho. Depois de revelar, ele fica mais quinze minutos no ar para quem
+        // chegou atrasado ler.
+        fimEm:
+          d.tipo === 'FOFOCOMETRO' && d.fofoca
+            ? new Date(new Date(d.fofoca.revelarEm).getTime() + 15 * 60 * 1000)
+            : new Date(agora.getTime() + d.duracaoSegundos * 1000),
         templateId: d.templateId ?? null,
         campanhaPatrocinadoraId: d.campanhaPatrocinadoraId ?? null,
         promocaoId: d.promocaoId ?? null,
+        config: d.tipo === 'FOFOCOMETRO' ? (d.fofoca as object) : {},
         criadoPorId: s.operadorId,
         opcoes: d.opcoes?.length
           ? { create: d.opcoes.map((o, i) => ({ ordem: i, rotulo: o.rotulo, emoji: o.emoji ?? null })) }
