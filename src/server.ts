@@ -30,8 +30,21 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', origem)
     res.setHeader('Vary', 'Origin')
     res.setHeader('Access-Control-Allow-Credentials', 'true')
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Tenant, X-App-Version, X-Platform')
+    // `If-None-Match` precisa estar aqui: sem ele o navegador barra no preflight toda
+    // consulta condicional, e o Estado No Ar — que é justamente quem usa ETag para
+    // responder 304 — só funcionava na primeira chamada. Da segunda em diante o app
+    // caía no ramo de erro e mostrava "sem conexão" com a rede perfeita.
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Authorization, X-Tenant, X-App-Version, X-Platform, If-None-Match',
+    )
+    // E o ETag precisa ser legível pelo JavaScript: por padrão o navegador esconde
+    // tudo que não seja um punhado de cabeçalhos simples.
+    res.setHeader('Access-Control-Expose-Headers', 'ETag')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
+    // Sem isso o navegador refaz o preflight a cada consulta — e o No Ar consulta a
+    // cada dois segundos.
+    res.setHeader('Access-Control-Max-Age', '86400')
   }
   if (req.method === 'OPTIONS') return res.sendStatus(204)
   next()
