@@ -6,7 +6,7 @@ import { redis, chaves } from '../../lib/redis.js'
 import { erros, ErroDaApi } from '../../lib/erros.js'
 import { exigirOuvinte } from '../../middleware/sessao.js'
 import { recalcular } from '../noar/servico.js'
-import { jaRevelou, type ConfigFofocometro } from './fofocometro.js'
+import { jaRevelou, paraOOuvinte, type ConfigFofocometro } from './fofocometro.js'
 
 export const rotasMomentos = Router()
 
@@ -169,6 +169,18 @@ rotasMomentos.get('/', exigirOuvinte(), async (req, res, next) => {
     res.json({
       momentos: momentos.map((m) => ({
         ...m,
+        // `config` NÃO sai cru daqui.
+        //
+        // Esta rota devolvia o objeto inteiro, e no Fofocômetro isso significava
+        // entregar a revelação — e a fonte — para qualquer pessoa que listasse os
+        // Momentos, minutos antes da hora. O `/no-ar` já estava protegido e a rota da
+        // revelação também; esta porta ficou aberta porque `...m` espalha tudo o que
+        // vem do banco, e ninguém se lembra do que "tudo" contém.
+        //
+        // A lição fica registrada aqui: campo livre em JSON exige filtro em CADA saída,
+        // não numa. `paraOOuvinte` é esse filtro, e agora existe um só lugar para
+        // mudá-lo.
+        config: paraOOuvinte(m),
         respondi: porMomento.has(m.id),
         minhaOpcaoId: porMomento.get(m.id) ?? null,
       })),
