@@ -31,7 +31,24 @@ async function varrer(): Promise<void> {
         // 1. Encerra o que passou da janela. A janela é ampla de propósito para
         //    absorver o delay entre FM e streaming — mas quando acaba, acabou.
         const encerrados = await prismaSemEscopo.momento.updateMany({
-          where: { emissoraId: emissora.id, estado: 'ATIVO', fimEm: { lt: agora } },
+          where: {
+            emissoraId: emissora.id,
+            estado: 'ATIVO',
+            OR: [
+              { fimEm: { lt: agora } },
+              // O Momento também morre quando o programa dele acaba, mesmo que ainda
+              // faltassem minutos no cronômetro.
+              //
+              // Sem isto, um Momento publicado nos instantes finais de uma edição
+              // ficava num limbo: ativo no banco, listado na aba Momentos, e invisível
+              // no No Ar — que só mostra o que pertence à edição corrente. O ouvinte
+              // via uma pergunta viva numa tela e nenhuma na outra.
+              //
+              // A regra vem do produto, não da conveniência: o Momento pertence à
+              // Edição. Terminou o programa, terminou o que acontecia dentro dele.
+              { edicao: { fimEm: { lt: agora } } },
+            ],
+          },
           data: { estado: 'ENCERRADO' },
         })
 
