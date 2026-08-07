@@ -84,6 +84,17 @@ app.get('/saude', async (_req, res) => {
 const v1 = express.Router()
 v1.get('/', (_req, res) => res.json({ versao: 'v1', servico: 'radio-connect-core' }))
 
+// A entrega de imagem fica ACIMA do escopo de emissora, e não abaixo.
+//
+// Quem busca a imagem é uma tag <img> do navegador: ela não manda `X-Tenant` nem
+// token, e não há como fazê-la mandar. Montada depois de `exigirEmissora()`, toda
+// imagem respondia 404 — o arquivo existia e a URL estava certa, mas a requisição
+// morria antes de chegar na rota.
+//
+// Não abre brecha: o id é um cuid, não enumerável, e o conteúdo é uma foto que já
+// está publicada para os ouvintes daquela rádio.
+v1.use('/midia', rotasMidiaPublica)
+
 // Tudo abaixo pertence a uma emissora. O middleware resolve o tenant e prende a
 // requisição inteira ao escopo dele — nenhuma consulta consegue ver outra rádio.
 v1.use(exigirEmissora())
@@ -94,9 +105,6 @@ v1.use('/conversa', rotasChat)
 // As rotas de chat da produção moram sob /studio junto com o resto da operação.
 v1.use('/studio', rotasChatStudio)
 v1.use('/studio', rotasMidia)
-// A entrega da imagem não passa por autenticação nem por tenant: quem pede é uma tag
-// <img>, que não manda token nem cabeçalho. O id é um cuid, não enumerável.
-v1.use('/midia', rotasMidiaPublica)
 v1.use('/studio', rotasStudio)
 
 app.use('/v1', v1)
