@@ -16,9 +16,23 @@ export const rotasStudio = Router()
 
 rotasStudio.post('/entrar', async (req, res, next) => {
   try {
-    const { email, senha } = z.object({ email: z.string().email(), senha: z.string().min(6) }).parse(req.body)
+    // `trim` antes de validar, e não depois.
+    //
+    // Copiar o e-mail de uma mensagem quase sempre traz um espaço junto, e o teclado
+    // do celular adiciona um sozinho ao completar a palavra. Sem isso a validação
+    // rejeitava o endereço certo com "não conseguimos entender esses dados" — e a
+    // pessoa ficava olhando para um e-mail visivelmente correto na tela.
+    //
+    // A senha também: espaço nas pontas nunca é intenção, é resíduo de cópia. Deixar
+    // passar dava o pior erro possível — "senha incorreta" para a senha certa.
+    const { email, senha } = z
+      .object({
+        email: z.string().trim().toLowerCase().email('Confira o e-mail: parece faltar algo.'),
+        senha: z.string().trim().min(6, 'A senha tem pelo menos 6 caracteres.'),
+      })
+      .parse(req.body)
 
-    const op = await prisma.operador.findFirst({ where: { email: email.toLowerCase(), ativo: true } })
+    const op = await prisma.operador.findFirst({ where: { email, ativo: true } })
     if (!op || !(await bcrypt.compare(senha, op.senhaHash))) {
       throw new ErroDaApi(401, 'credenciais_invalidas', 'E-mail ou senha incorretos.')
     }

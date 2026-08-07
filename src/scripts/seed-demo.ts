@@ -113,8 +113,13 @@ async function main() {
   // ocupa exatamente esse buraco — 10h→11h, 13h→14h, 17h→18h, 21h→22h — e é isso que
   // fecha a grade sem sobreposição.
   //
-  // Fica UMA lacuna real, das 20h às 21h, que o documento não cobre. Não inventamos
-  // programa: o horário fica vazio até a emissora dizer o que entra ali.
+  // Das 20h às 21h **não entra programa nenhum, e é de propósito**: é o horário
+  // político eleitoral, que a emissora é obrigada a veicular. Sem programa não há
+  // Edição, sem Edição não há Momento — o app fica em silêncio exatamente durante a
+  // hora em que não pode haver interação comercial nem promocional.
+  //
+  // Se um dia alguém "consertar" essa lacuna preenchendo o buraco, vai criar um
+  // problema regulatório, não resolver um problema de grade.
   type Bloco = {
     nome: string
     equipe: string[]
