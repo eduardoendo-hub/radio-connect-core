@@ -53,6 +53,7 @@ model Emissora {
   eventos       Evento[]
   impressoes    ImpressaoAnuncio[]
   beneficios    Beneficio[]
+  arquivos      Arquivo[]
 
   @@map("emissoras")
 }
@@ -729,4 +730,31 @@ model Evento {
   @@index([emissoraId, nome, ocorridoEmServidor])
   @@index([ouvinteId])
   @@map("eventos")
+}
+
+/// Imagem enviada pela produção — foto de fofoca, arte de promoção, logo de patrocinador.
+///
+/// **Guardada no banco, e não em disco.** O container é efêmero: qualquer arquivo escrito
+/// nele some no próximo deploy, e um volume seria mais uma peça de infraestrutura para
+/// cada emissora manter. São poucas imagens, pequenas e sempre ligadas a um Momento —
+/// cabem numa coluna, viajam no backup junto com o resto e não criam um segundo lugar
+/// onde o dado de uma rádio pode acabar misturado com o de outra.
+///
+/// Quando o volume justificar, isto vira uma chave para um bucket e só o `dados` some.
+/// A URL que o aplicativo conhece não muda.
+model Arquivo {
+  id         String   @id @default(cuid())
+  emissoraId String
+  emissora   Emissora @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+
+  nome     String
+  tipoMime String
+  bytes    Int
+  dados    Bytes
+
+  criadoPorId String?
+  criadoEm    DateTime @default(now())
+
+  @@index([emissoraId, criadoEm])
+  @@map("arquivos")
 }

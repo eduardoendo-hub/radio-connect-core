@@ -165,6 +165,9 @@ const criarMomento = z.object({
         imagemUrl: z.string().max(500).nullish(),
       }),
       fonte: z.string().max(200).nullish(),
+      patrocinador: z
+        .object({ nome: z.string().min(1).max(60), logoUrl: z.string().max(500).nullish() })
+        .nullish(),
     })
     .optional(),
 })

@@ -36,6 +36,15 @@ export type ConfigFofocometro = {
   revelacao: { texto: string; imagemUrl?: string | null }
   /** De onde veio a informação. Não aparece para o ouvinte: é rastro editorial. */
   fonte?: string | null
+  /**
+   * Quem paga a espera.
+   *
+   * O Fofocômetro é o inventário mais valioso do produto: enquanto o relógio corre, a
+   * tela é da marca e a pessoa está esperando de propósito. É atenção com hora marcada,
+   * que vale mais do que qualquer banner de rolagem — e por isso a assinatura fica
+   * durante a contagem, não depois dela.
+   */
+  patrocinador?: { nome: string; logoUrl?: string | null } | null
 }
 
 export function ehFofocometro(tipo: string): boolean {
@@ -64,6 +73,9 @@ export function paraOOuvinte(momento: { tipo: string; config: unknown }, agora =
   return {
     revelarEm: c.revelarEm ?? null,
     revelado,
+    // O patrocinador é público desde o primeiro segundo: é justamente durante a espera
+    // que ele foi comprado.
+    patrocinador: c.patrocinador ?? null,
     // Só existe no objeto depois da hora. Não é `null` escondido: a chave nem vem.
     ...(revelado ? { revelacao: c.revelacao } : {}),
   }
