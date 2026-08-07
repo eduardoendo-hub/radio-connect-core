@@ -67,7 +67,12 @@ rotasStudio.get('/hoje', exigirOperador(), async (req, res, next) => {
       where: { inicioEm: { gte: inicio, lte: fim } },
       orderBy: { inicioEm: 'asc' },
       include: {
-        programa: { select: { id: true, nome: true, imagemUrl: true, corDestaque: true } },
+        programa: {
+          select: {
+            id: true, nome: true, imagemUrl: true, corDestaque: true,
+            equipe: { select: { id: true, nome: true, imagemUrl: true } },
+          },
+        },
         locutor: { select: { id: true, nome: true, imagemUrl: true } },
         _count: { select: { momentos: true } },
       },
@@ -108,7 +113,9 @@ rotasStudio.get('/edicoes/:id', exigirOperador(), async (req, res, next) => {
     const edicao = await prisma.edicao.findFirst({
       where: { id: req.params.id },
       include: {
-        programa: true,
+        // A equipe vem junto: no cabeçalho da operação o produtor vê quem está no
+        // microfone naquele instante, não só quem assina.
+        programa: { include: { equipe: { select: { id: true, nome: true, imagemUrl: true } } } },
         locutor: true,
         momentos: {
           orderBy: { inicioEm: 'asc' },
