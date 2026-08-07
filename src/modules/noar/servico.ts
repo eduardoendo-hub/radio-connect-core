@@ -38,7 +38,11 @@ export type EstadoNoAr = {
     /// toda a emissora e fica em cache, então o que trafegasse por ele estaria
     /// disponível para qualquer um antes da hora. Aqui vai só o instante da abertura —
     /// o aplicativo conta o tempo e busca a revelação quando ele zera.
-    fofoca: { revelarEm: string | null; revelado: boolean } | null
+    fofoca: {
+      revelarEm: string | null
+      revelado: boolean
+      patrocinador: { nome: string; logoUrl: string | null } | null
+    } | null
   } | null
   promocao: { id: string; titulo: string; imagemUrl: string | null } | null
   proxima: { nome: string; comeca: string } | null
@@ -113,10 +117,21 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
           terminaEm: momento.fimEm.toISOString(),
           opcoes: momento.opcoes,
           patrocinada: Boolean(momento.campanhaPatrocinadoraId),
+          // O que o ouvinte pode ver do Fofocômetro agora — a revelação nunca entra
+          // aqui, mas o patrocinador sim: ele comprou justamente a espera.
+          //
+          // Este objeto é montado à mão em vez de reaproveitar `paraOOuvinte` porque o
+          // Estado No Ar tem contrato próprio e versionado. O preço de duplicar é
+          // exatamente este: um campo novo precisa ser lembrado nos dois lugares, e o
+          // patrocinador foi esquecido aqui na primeira vez.
           fofoca: ehFofocometro(momento.tipo)
             ? {
                 revelarEm: (momento.config as { revelarEm?: string } | null)?.revelarEm ?? null,
                 revelado: jaRevelou(momento.config, agora),
+                patrocinador:
+                  (momento.config as {
+                    patrocinador?: { nome: string; logoUrl: string | null }
+                  } | null)?.patrocinador ?? null,
               }
             : null,
         }
