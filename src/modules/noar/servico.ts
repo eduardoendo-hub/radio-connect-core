@@ -19,6 +19,9 @@ export type EstadoNoAr = {
   aoVivo: boolean
   programa: { id: string; nome: string; imagemUrl: string | null; corDestaque: string | null } | null
   locutor: { id: string; nome: string; imagemUrl: string | null } | null
+  /// Quem mais está no microfone. O titular vem em `locutor`; aqui vem a equipe
+  /// inteira, na ordem em que a rádio escala — inclusive ele.
+  equipe: { id: string; nome: string; imagemUrl: string | null }[]
   edicaoId: string | null
   termina: string | null
   momento: {
@@ -46,7 +49,12 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
     where: { inicioEm: { lte: agora }, fimEm: { gte: agora } },
     orderBy: { inicioEm: 'desc' },
     include: {
-      programa: { select: { id: true, nome: true, imagemUrl: true, corDestaque: true } },
+      programa: {
+        select: {
+          id: true, nome: true, imagemUrl: true, corDestaque: true,
+          equipe: { select: { id: true, nome: true, imagemUrl: true } },
+        },
+      },
       locutor: { select: { id: true, nome: true, imagemUrl: true } },
     },
   })
@@ -79,6 +87,14 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
     aoVivo: Boolean(edicao),
     programa: edicao?.programa ?? null,
     locutor: edicao?.locutor ?? null,
+    // O titular abre a lista: "A Hora do Ronco, com Tadeu, Emerson e Pedro Luiz" —
+    // quem assina vem primeiro, sempre.
+    equipe: edicao
+      ? [
+          ...(edicao.locutor ? [edicao.locutor] : []),
+          ...(edicao.programa?.equipe ?? []).filter((p) => p.id !== edicao.locutorId),
+        ]
+      : [],
     edicaoId: edicao?.id ?? null,
     termina: edicao?.fimEm.toISOString() ?? null,
     momento: momento

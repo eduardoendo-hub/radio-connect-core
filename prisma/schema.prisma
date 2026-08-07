@@ -76,6 +76,17 @@ model Programa {
   locutorTitularId String?
   locutorTitular   Locutor? @relation(fields: [locutorTitularId], references: [id])
 
+  /// A equipe que divide o microfone.
+  ///
+  /// Rádio quase nunca é uma voz só: "A Hora do Ronco" tem três pessoas no ar ao mesmo
+  /// tempo, e o ouvinte reconhece as três. Guardar só o titular apagaria justamente o
+  /// que faz a manhã ser aquela manhã.
+  ///
+  /// A equipe é do **programa** e não da edição porque no MVP a escalação é fixa. No dia
+  /// em que a rádio quiser trocar quem entra hoje, isso vira uma relação na Edição — e o
+  /// titular continua sendo quem assina.
+  equipe Locutor[] @relation("EquipeDoPrograma")
+
   // Programa Patrocinado: assina o No Ar durante as edições deste programa
   campanhaPatrocinadoraId String?
   campanhaPatrocinadora   Campanha? @relation("ProgramaPatrocinado", fields: [campanhaPatrocinadoraId], references: [id])
@@ -101,6 +112,8 @@ model Locutor {
 
   programas Programa[]
   edicoes   Edicao[]
+  /// Programas em que esta pessoa divide o microfone sem ser a titular.
+  naEquipeDe Programa[] @relation("EquipeDoPrograma")
 
   @@index([emissoraId])
   @@map("locutores")
