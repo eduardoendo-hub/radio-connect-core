@@ -441,6 +441,77 @@ async function main() {
       },
     }))
 
+  // ── Inventário publicitário de verdade ─────────────────────
+  //
+  // Entra no seed porque o capítulo do inventário trata publicidade como requisito de
+  // MVP, não de fase dois: a receita do produto vem de mídia, e uma rádio que não vê o
+  // anúncio na tela não entende como isso se paga.
+  //
+  // A Soneda é o anunciante da demonstração, com um banner e um pré-roll de oito
+  // segundos. Vendida pela rádio — revenue share 70/30 —, que é o caso que interessa
+  // mostrar: o comercial da emissora continua vendendo, e a plataforma entrega.
+  const soneda =
+    (await db.anunciante.findFirst({ where: { emissoraId: emissora.id, nome: 'Soneda' } })) ??
+    (await db.anunciante.create({
+      data: { emissoraId: emissora.id, nome: 'Soneda', contato: 'comercial@soneda.com.br' },
+    }))
+
+  const campanhaSoneda =
+    (await db.campanha.findFirst({ where: { emissoraId: emissora.id, nome: 'Soneda · Agosto' } })) ??
+    (await db.campanha.create({
+      data: {
+        emissoraId: emissora.id,
+        anuncianteId: soneda.id,
+        nome: 'Soneda · Agosto',
+        formato: 'banner',
+        status: 'ATIVA',
+        inicioEm: new Date(),
+        fimEm: new Date(Date.now() + 30 * 86400000),
+        vendidoPor: 'RADIO',
+        valorTotal: '12000.00',
+      },
+    }))
+
+  // As URLs vêm do ambiente porque os arquivos são enviados pela rota de mídia e
+  // ganham id no envio — não dá para chumbar no código.
+  const bannerUrl = process.env.CRIATIVO_BANNER_URL
+  const prerollUrl = process.env.CRIATIVO_PREROLL_URL
+
+  if (bannerUrl) {
+    const jaTem = await db.criativo.findFirst({ where: { campanhaId: campanhaSoneda.id, tipo: 'imagem' } })
+    if (jaTem) {
+      await db.criativo.update({ where: { id: jaTem.id }, data: { url: bannerUrl } })
+    } else {
+      await db.criativo.create({
+        data: {
+          campanhaId: campanhaSoneda.id,
+          tipo: 'imagem',
+          url: bannerUrl,
+          clickUrl: 'https://www.soneda.com.br',
+          posicoes: ['no_ar_banner', 'chat_inline'],
+        },
+      })
+    }
+  }
+
+  if (prerollUrl) {
+    const jaTem = await db.criativo.findFirst({ where: { campanhaId: campanhaSoneda.id, tipo: 'audio' } })
+    if (jaTem) {
+      await db.criativo.update({ where: { id: jaTem.id }, data: { url: prerollUrl } })
+    } else {
+      await db.criativo.create({
+        data: {
+          campanhaId: campanhaSoneda.id,
+          tipo: 'audio',
+          url: prerollUrl,
+          duracao: 9,
+          posicoes: ['preroll'],
+        },
+      })
+    }
+  }
+  console.log(`  campanha Soneda: banner ${bannerUrl ? 'ok' : '—'} · pré-roll ${prerollUrl ? 'ok' : '—'}`)
+
   const jaTemPromo = await db.promocao.findFirst({ where: { emissoraId: emissora.id, titulo: { contains: 'ingressos' } } })
   if (!jaTemPromo) {
     await db.promocao.create({

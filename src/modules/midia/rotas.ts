@@ -21,8 +21,13 @@ import { exigirOperador } from '../../middleware/sessao.js'
 export const rotasMidia = Router()
 export const rotasMidiaPublica = Router()
 
-const TIPOS = new Set(['image/jpeg', 'image/png', 'image/webp'])
-const TETO = 4 * 1024 * 1024
+// Imagem para banner e foto; áudio para o pré-roll. O pré-roll é curto por natureza —
+// dez, quinze segundos — e não justifica um caminho de upload próprio.
+const TIPOS = new Set([
+  'image/jpeg', 'image/png', 'image/webp',
+  'audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/x-m4a',
+])
+const TETO = 6 * 1024 * 1024
 
 const PAPEIS = ['PRODUTOR', 'MARKETING', 'DIRETOR', 'ADMIN'] as const
 
@@ -35,7 +40,7 @@ rotasMidia.post(
       const tipo = String(req.headers['content-type'] ?? '').split(';')[0]?.trim() ?? ''
       if (!TIPOS.has(tipo)) {
         throw new ErroDaApi(415, 'formato_nao_aceito',
-          'Envie a imagem em JPEG, PNG ou WebP.')
+          'Envie imagem em JPEG, PNG ou WebP, ou áudio em MP3 ou M4A.')
       }
 
       const dados = req.body as Buffer
@@ -44,7 +49,7 @@ rotasMidia.post(
       }
       if (dados.length > TETO) {
         throw new ErroDaApi(413, 'arquivo_grande',
-          'A imagem passa de 4 MB. Diminua antes de enviar.')
+          'O arquivo passa de 6 MB. Diminua antes de enviar.')
       }
 
       const s = req.sessao as { operadorId: string }

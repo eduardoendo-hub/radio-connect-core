@@ -11,6 +11,7 @@ import { rotasMomentos } from './modules/momentos/rotas.js'
 import { rotasStudio } from './modules/studio/rotas.js'
 import { rotasChat, rotasChatStudio } from './modules/chat/rotas.js'
 import { rotasMidia, rotasMidiaPublica } from './modules/midia/rotas.js'
+import { rotasAnuncios } from './modules/anuncios/rotas.js'
 import { iniciarAgendador, pararAgendador } from './modules/noar/agendador.js'
 
 const app = express()
@@ -102,6 +103,7 @@ v1.use('/auth', rotasAuth)
 v1.use('/no-ar', rotasNoAr)
 v1.use('/momentos', rotasMomentos)
 v1.use('/conversa', rotasChat)
+v1.use('/anuncios', rotasAnuncios)
 // As rotas de chat da produção moram sob /studio junto com o resto da operação.
 v1.use('/studio', rotasChatStudio)
 v1.use('/studio', rotasMidia)
