@@ -140,6 +140,40 @@ rotasStudio.get('/templates', exigirOperador(), async (req, res, next) => {
   }
 })
 
+/**
+ * As campanhas que podem assinar um Momento agora.
+ *
+ * Só as vigentes: uma campanha que terminou ontem não pode ser escolhida hoje, e essa
+ * checagem tem que ser do servidor. Se ficasse na tela, bastaria a aba estar aberta
+ * desde a véspera para o produtor patrocinar um Momento com contrato vencido — e isso
+ * é dinheiro que a rádio entrega de graça.
+ */
+rotasStudio.get('/campanhas', exigirOperador(), async (req, res, next) => {
+  try {
+    const agora = new Date()
+    const campanhas = await prisma.campanha.findMany({
+      where: { status: 'ATIVA', inicioEm: { lte: agora }, fimEm: { gte: agora } },
+      orderBy: { nome: 'asc' },
+      select: {
+        id: true,
+        nome: true,
+        anunciante: { select: { nome: true } },
+        criativos: { select: { tipo: true, url: true } },
+      },
+    })
+    res.json({
+      campanhas: campanhas.map((c) => ({
+        id: c.id,
+        nome: c.nome,
+        anunciante: c.anunciante.nome,
+        logoUrl: c.criativos.find((k) => k.tipo === 'imagem')?.url ?? null,
+      })),
+    })
+  } catch (e) {
+    next(e)
+  }
+})
+
 // ─────────────────────────────────────────────────────────────
 // Momentos — meta de UX: criar em menos de 20 segundos
 // ─────────────────────────────────────────────────────────────

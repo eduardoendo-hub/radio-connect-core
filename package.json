@@ -17,7 +17,7 @@
     "prisma:studio": "prisma studio",
     "seed:demo": "tsx src/scripts/seed-demo.ts",
     "gerador:vida": "tsx src/scripts/gerador-de-vida.ts",
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "tsx --test 'src/**/*.test.ts'",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

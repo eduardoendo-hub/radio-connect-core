@@ -92,6 +92,16 @@ model Programa {
   campanhaPatrocinadoraId String?
   campanhaPatrocinadora   Campanha? @relation("ProgramaPatrocinado", fields: [campanhaPatrocinadoraId], references: [id])
 
+  /// Se este programa aceita publicidade.
+  ///
+  /// Existe porque nem todo horário pode ser vendido. O horário político eleitoral é
+  /// o caso óbvio, mas há também o programa religioso, o jornalístico que a emissora
+  /// decide manter limpo, e o especial já vendido por fora com exclusividade — em
+  /// todos, servir banner ou pré-roll é problema jurídico ou comercial, não receita.
+  ///
+  /// Padrão ligado: a rádio vive de mídia, e desligar é a exceção.
+  anunciosAtivos Boolean @default(true)
+
   ativo    Boolean     @default(true)
   criadoEm DateTime    @default(now())
   slots    SlotGrade[]
@@ -302,6 +312,24 @@ model TemplateMomento {
   opcoesPadrao    Json    @default("[]")
   duracaoSegundos Int     @default(180)
   favorito        Boolean @default(false)
+
+  /// A identidade visual do quadro — cor e ícone que o ouvinte aprende a reconhecer.
+  ///
+  /// Mora aqui, e não no `TipoMomento`, porque identidade é do **quadro** e não da
+  /// mecânica: "Batalha das Músicas" e "Qual música toca agora?" são o mesmo tipo
+  /// (escolha, duas opções) e coisas completamente diferentes para quem ouve. Uma é um
+  /// duelo com vencedor; a outra é serviço.
+  ///
+  /// **Poucos quadros devem preencher isto.** Se todo formato tiver cor própria, nenhum
+  /// se destaca — vira arco-íris e a hierarquia morre. Rádio resolveu isso há décadas:
+  /// alguns quadros têm vinheta, a maioria não, e é justamente por isso que a vinheta
+  /// significa alguma coisa. Sem `cor`, o Momento usa a linguagem da emissora, que é o
+  /// fundo do qual os quadros com marca se destacam.
+  ///
+  /// Como fica no template, a rádio cria um quadro novo com identidade sem ninguém
+  /// escrever código.
+  cor   String? // "#E8437B"
+  icone String? // nome no Material Symbols: "campaign", "swords"…
 
   momentos Momento[]
 

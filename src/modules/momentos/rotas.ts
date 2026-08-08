@@ -7,6 +7,7 @@ import { erros, ErroDaApi } from '../../lib/erros.js'
 import { exigirOuvinte } from '../../middleware/sessao.js'
 import { recalcular } from '../noar/servico.js'
 import { jaRevelou, paraOOuvinte, type ConfigFofocometro } from './fofocometro.js'
+import { identidadeDe, patrocinioDe, incluirApresentacao } from './apresentacao.js'
 
 export const rotasMomentos = Router()
 
@@ -150,7 +151,10 @@ rotasMomentos.get('/', exigirOuvinte(), async (req, res, next) => {
       where: { estado: { in: ['ATIVO', 'ENCERRADO', 'RESULTADO_PUBLICADO'] }, inicioEm: { gte: desde } },
       orderBy: { inicioEm: 'desc' },
       take: 20,
-      include: { opcoes: { orderBy: { ordem: 'asc' }, select: { id: true, rotulo: true, emoji: true, votos: true } } },
+      include: {
+        opcoes: { orderBy: { ordem: 'asc' }, select: { id: true, rotulo: true, emoji: true, votos: true } },
+        ...incluirApresentacao,
+      },
     })
 
     // O que esta pessoa já respondeu. Sem isso o app não tem como lembrar da própria
@@ -181,6 +185,8 @@ rotasMomentos.get('/', exigirOuvinte(), async (req, res, next) => {
         // não numa. `paraOOuvinte` é esse filtro, e agora existe um só lugar para
         // mudá-lo.
         config: paraOOuvinte(m),
+        identidade: identidadeDe(m),
+        patrocinio: patrocinioDe(m),
         respondi: porMomento.has(m.id),
         minhaOpcaoId: porMomento.get(m.id) ?? null,
       })),

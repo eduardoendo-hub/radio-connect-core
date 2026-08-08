@@ -58,6 +58,20 @@ rotasAnuncios.get('/', exigirOuvinte(), async (req, res, next) => {
       return res.json({ anuncio: null, motivo: 'desligado' })
     }
 
+    // O programa no ar pode não aceitar publicidade.
+    //
+    // Vale para banner E pré-roll: no horário político eleitoral, no religioso ou no
+    // especial vendido com exclusividade, servir qualquer anúncio é problema jurídico
+    // ou quebra de contrato — não receita. A decisão é do servidor porque o app não
+    // pode ser o guardião de uma regra que custa caro errar.
+    const noAr = await prisma.edicao.findFirst({
+      where: { inicioEm: { lte: agora }, fimEm: { gte: agora } },
+      select: { programa: { select: { anunciosAtivos: true } } },
+    })
+    if (noAr && !noAr.programa.anunciosAtivos) {
+      return res.json({ anuncio: null, motivo: 'programa_sem_publicidade' })
+    }
+
     // Momento no ar? Então o banner não entra.
     if (posicao === 'no_ar_banner') {
       const momentoAtivo = await prisma.momento.count({

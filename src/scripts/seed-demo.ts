@@ -17,7 +17,7 @@ const CORES = {
   primaria: '#F6821F', // laranja Band FM, amostrado do deck
   fundo: '#0B0B0C',
   superficie: '#151517',
-  aoVivo: '#E3271E', // o vermelho do "AO VIVO" — reservado, significa "acontecendo agora"
+  aoVivo: '#FF5A4E', // o vermelho do "AO VIVO" — reservado, significa "acontecendo agora"
 }
 
 async function main() {
@@ -141,16 +141,16 @@ async function main() {
     { nome: 'Band Bom Dia', equipe: ['Tadeu Correa', 'Emerson França'], inicio: '05:00', fim: '06:00', cor: '#F6821F' },
     { nome: 'A Hora do Ronco', equipe: ['Tadeu Correa', 'Emerson França', 'Pedro Luiz Ronco'], inicio: '06:00', fim: '09:00', cor: '#F6821F' },
     { nome: 'Manhã Show', equipe: ['Milena Barros', 'Kaká'], inicio: '09:00', fim: '10:00', cor: '#22A06B' },
-    { nome: 'Super 6', equipe: ['Milena Barros'], inicio: '10:00', fim: '11:00', cor: '#E3271E', chave: 'Super 6 · 10h' },
+    { nome: 'Super 6', equipe: ['Milena Barros'], inicio: '10:00', fim: '11:00', cor: '#F0574D', chave: 'Super 6 · 10h' },
     { nome: 'Quem Ama Não Esquece', equipe: ['Milena Barros'], inicio: '11:00', fim: '12:15', cor: '#6E56CF' },
     { nome: 'Minha Música, Minha Vida', equipe: ['Milena Barros'], inicio: '12:15', fim: '13:00', cor: '#6E56CF' },
-    { nome: 'Super 6', equipe: ['Marcelo Café'], inicio: '13:00', fim: '14:00', cor: '#E3271E', chave: 'Super 6 · 13h' },
+    { nome: 'Super 6', equipe: ['Marcelo Café'], inicio: '13:00', fim: '14:00', cor: '#F0574D', chave: 'Super 6 · 13h' },
     { nome: 'Curte Aí', equipe: ['Marcelo Café'], inicio: '14:00', fim: '14:40', cor: '#22A06B' },
     { nome: 'Tamo Junto', equipe: ['Marcelo Café', 'Pedro Rafael'], inicio: '14:40', fim: '17:00', cor: '#22A06B' },
-    { nome: 'Super 6', equipe: ['Robson Ramos'], inicio: '17:00', fim: '18:00', cor: '#E3271E', chave: 'Super 6 · 17h' },
-    { nome: 'Band ao Vivo', equipe: ['Robson Ramos'], inicio: '18:00', fim: '18:25', cor: '#E3271E' },
+    { nome: 'Super 6', equipe: ['Robson Ramos'], inicio: '17:00', fim: '18:00', cor: '#F0574D', chave: 'Super 6 · 17h' },
+    { nome: 'Band ao Vivo', equipe: ['Robson Ramos'], inicio: '18:00', fim: '18:25', cor: '#F0574D' },
     { nome: 'Estação Band FM', equipe: ['Robson Ramos', 'Paulo Gomes', 'Maicon Sales'], inicio: '18:25', fim: '20:00', cor: '#6E56CF' },
-    { nome: 'Super 6', equipe: ['Marcelo Dias'], inicio: '21:00', fim: '22:00', cor: '#E3271E', chave: 'Super 6 · 21h' },
+    { nome: 'Super 6', equipe: ['Marcelo Dias'], inicio: '21:00', fim: '22:00', cor: '#F0574D', chave: 'Super 6 · 21h' },
     { nome: 'Band Love', equipe: ['Marcelo Dias'], inicio: '22:00', fim: '23:59', cor: '#1E4FD8' },
   ]
 
@@ -169,13 +169,13 @@ async function main() {
     { nome: 'Band Bom Dia', equipe: PLANTAO, inicio: '05:00', fim: '07:00', cor: '#F6821F' },
     { nome: 'Top 5 · A Hora do Ronco', equipe: PLANTAO, inicio: '07:00', fim: '09:00', cor: '#F6821F' },
     { nome: 'Manhã Show', equipe: PLANTAO, inicio: '09:00', fim: '11:00', cor: '#22A06B' },
-    { nome: 'Super 6', equipe: PLANTAO, inicio: '11:00', fim: '12:00', cor: '#E3271E', chave: 'Super 6 · 11h' },
+    { nome: 'Super 6', equipe: PLANTAO, inicio: '11:00', fim: '12:00', cor: '#F0574D', chave: 'Super 6 · 11h' },
     { nome: 'Festa da Band', equipe: PLANTAO, inicio: '12:00', fim: '14:00', cor: '#D6336C' },
-    { nome: 'Super 6', equipe: PLANTAO, inicio: '14:00', fim: '15:00', cor: '#E3271E', chave: 'Super 6 · 14h' },
+    { nome: 'Super 6', equipe: PLANTAO, inicio: '14:00', fim: '15:00', cor: '#F0574D', chave: 'Super 6 · 14h' },
     { nome: 'Hora Cheia', equipe: PLANTAO, inicio: '15:00', fim: '16:00', cor: '#6E56CF' },
     { nome: 'Dá Play', equipe: PLANTAO, inicio: '16:00', fim: '18:00', cor: '#22A06B' },
-    { nome: 'Band ao Vivo', equipe: PLANTAO, inicio: '18:00', fim: '19:00', cor: '#E3271E' },
-    { nome: 'Super 6', equipe: PLANTAO, inicio: '19:00', fim: '20:00', cor: '#E3271E', chave: 'Super 6 · 19h' },
+    { nome: 'Band ao Vivo', equipe: PLANTAO, inicio: '18:00', fim: '19:00', cor: '#F0574D' },
+    { nome: 'Super 6', equipe: PLANTAO, inicio: '19:00', fim: '20:00', cor: '#F0574D', chave: 'Super 6 · 19h' },
     { nome: 'Hora Cheia', equipe: PLANTAO, inicio: '20:00', fim: '21:00', cor: '#6E56CF', chave: 'Hora Cheia · 20h' },
     { nome: 'Pista da Band', equipe: PLANTAO, inicio: '21:00', fim: '23:59', cor: '#1E4FD8' },
   ]
@@ -184,13 +184,13 @@ async function main() {
     { nome: 'Band Coruja', equipe: PLANTAO, inicio: '00:00', fim: '05:00', cor: '#1E4FD8' },
     { nome: 'Band Bom Dia', equipe: PLANTAO, inicio: '05:00', fim: '07:00', cor: '#F6821F' },
     { nome: 'Estação Band FM', equipe: PLANTAO, inicio: '07:00', fim: '09:00', cor: '#6E56CF' },
-    { nome: 'Band ao Vivo', equipe: PLANTAO, inicio: '09:00', fim: '11:00', cor: '#E3271E' },
-    { nome: 'Super 6', equipe: PLANTAO, inicio: '11:00', fim: '12:00', cor: '#E3271E', chave: 'Super 6 · 11h' },
+    { nome: 'Band ao Vivo', equipe: PLANTAO, inicio: '09:00', fim: '11:00', cor: '#F0574D' },
+    { nome: 'Super 6', equipe: PLANTAO, inicio: '11:00', fim: '12:00', cor: '#F0574D', chave: 'Super 6 · 11h' },
     { nome: 'Festa da Band', equipe: PLANTAO, inicio: '12:00', fim: '15:00', cor: '#D6336C' },
     { nome: 'As Mais Pedidas da Semana', equipe: PLANTAO, inicio: '15:00', fim: '16:00', cor: '#22A06B' },
     { nome: 'Dá Play', equipe: PLANTAO, inicio: '16:00', fim: '18:00', cor: '#22A06B' },
-    { nome: 'Band ao Vivo', equipe: PLANTAO, inicio: '18:00', fim: '19:00', cor: '#E3271E', chave: 'Band ao Vivo · 18h' },
-    { nome: 'Super 6', equipe: PLANTAO, inicio: '19:00', fim: '20:00', cor: '#E3271E', chave: 'Super 6 · 19h' },
+    { nome: 'Band ao Vivo', equipe: PLANTAO, inicio: '18:00', fim: '19:00', cor: '#F0574D', chave: 'Band ao Vivo · 18h' },
+    { nome: 'Super 6', equipe: PLANTAO, inicio: '19:00', fim: '20:00', cor: '#F0574D', chave: 'Super 6 · 19h' },
     { nome: 'As Mais Pedidas da Semana', equipe: PLANTAO, inicio: '20:00', fim: '21:00', cor: '#22A06B', chave: 'As Mais Pedidas · 20h' },
     { nome: 'Band Love', equipe: PLANTAO, inicio: '21:00', fim: '23:59', cor: '#1E4FD8' },
   ]
@@ -367,12 +367,18 @@ async function main() {
       favorito: true,
     },
     {
+      // Um dos dois quadros com identidade própria. Ver o comentário em
+      // `TemplateMomento.cor`: poucos formatos devem ter marca, senão nenhum se
+      // destaca. A Batalha ganha porque é duelo com vencedor — tem ritual, e ritual
+      // vira expectativa.
       nome: 'Batalha das Músicas',
       tipo: 'ESCOLHA' as const,
       titulo: 'Batalha! Quem leva essa?',
       opcoesPadrao: [{ rotulo: 'Artista A' }, { rotulo: 'Artista B' }],
       duracaoSegundos: 240,
       favorito: true,
+      cor: '#1E9BD8',
+      icone: 'swords',
     },
     {
       nome: 'Enquete rápida',
@@ -399,6 +405,8 @@ async function main() {
       opcoesPadrao: [],
       duracaoSegundos: 600,
       favorito: true,
+      cor: '#E8437B',
+      icone: 'campaign',
     },
     {
       nome: 'Chamada de promoção',
@@ -411,7 +419,16 @@ async function main() {
   ]
   for (const t of templates) {
     const jaTem = await db.templateMomento.findFirst({ where: { emissoraId: emissora.id, nome: t.nome } })
-    if (!jaTem) await db.templateMomento.create({ data: { emissoraId: emissora.id, ...t } })
+    if (jaTem) {
+      // A identidade pode ter sido definida depois do template existir — atualizar é o
+      // que faz o seed convergir em vez de só criar.
+      await db.templateMomento.update({
+        where: { id: jaTem.id },
+        data: { cor: ('cor' in t ? t.cor : null) ?? null, icone: ('icone' in t ? t.icone : null) ?? null },
+      })
+    } else {
+      await db.templateMomento.create({ data: { emissoraId: emissora.id, ...t } })
+    }
   }
   console.log(`  ${templates.length} templates de Momento`)
 
@@ -511,6 +528,27 @@ async function main() {
     }
   }
   console.log(`  campanha Soneda: banner ${bannerUrl ? 'ok' : '—'} · pré-roll ${prerollUrl ? 'ok' : '—'}`)
+
+  // ── Programa patrocinado ────────────────────────────────────
+  //
+  // O inventário mais caro que a rádio tem: um programa roda três horas por dia, todo
+  // dia útil, e a assinatura fica no cabeçalho o tempo inteiro. Um Momento patrocinado
+  // dura três minutos.
+  //
+  // "A Hora do Ronco" é o horário nobre da manhã — é o que a emissora venderia primeiro.
+  const patrocinado = await db.programa.findFirst({
+    where: { emissoraId: emissora.id, nome: 'A Hora do Ronco' },
+  })
+  if (patrocinado) {
+    await db.programa.update({
+      where: { id: patrocinado.id },
+      data: { campanhaPatrocinadoraId: campanhaSoneda.id },
+    })
+    console.log('  A Hora do Ronco é um oferecimento Soneda')
+  }
+
+  // O horário político eleitoral não tem programa — mas se um dia tiver, a publicidade
+  // fica desligada nele. O campo existe para essa decisão ser dado, e não código.
 
   const jaTemPromo = await db.promocao.findFirst({ where: { emissoraId: emissora.id, titulo: { contains: 'ingressos' } } })
   if (!jaTemPromo) {

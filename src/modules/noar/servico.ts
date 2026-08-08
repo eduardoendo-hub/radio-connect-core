@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma.js'
 import { ehFofocometro, jaRevelou } from '../momentos/fofocometro.js'
+import { identidadeDe, patrocinioDe, incluirApresentacao, type Identidade, type Patrocinio } from '../momentos/apresentacao.js'
 import { redis, redisPub, chaves } from '../../lib/redis.js'
 import { env } from '../../lib/env.js'
 
@@ -24,6 +25,16 @@ export type EstadoNoAr = {
   /// inteira, na ordem em que a rádio escala — inclusive ele.
   equipe: { id: string; nome: string; imagemUrl: string | null }[]
   edicaoId: string | null
+  /**
+   * Quem oferece o programa que está no ar.
+   *
+   * Vem separado do patrocínio do Momento de propósito. São inventários diferentes:
+   * o do programa é permanente e barato por hora, o do Momento é pontual e caro por
+   * minuto. Quem decide qual dos dois aparece é o app — ver a regra ali.
+   */
+  patrocinioDoPrograma: { nome: string; logoUrl: string | null } | null
+  /// Se este horário aceita publicidade. Ver `Programa.anunciosAtivos`.
+  anunciosAtivos: boolean
   termina: string | null
   momento: {
     id: string
@@ -34,6 +45,11 @@ export type EstadoNoAr = {
     terminaEm: string
     opcoes: { id: string; rotulo: string; emoji: string | null }[]
     patrocinada: boolean
+    /// A identidade do quadro, quando ele tem uma. A maioria não tem — e é isso que
+    /// faz os poucos que têm se destacarem.
+    identidade: Identidade
+    /// Quem assina este Momento. Vale para qualquer formato, não só o Fofocômetro.
+    patrocinio: Patrocinio
     /// Só no Fofocômetro. A revelação **não** vem aqui: o Estado No Ar é o mesmo para
     /// toda a emissora e fica em cache, então o que trafegasse por ele estaria
     /// disponível para qualquer um antes da hora. Aqui vai só o instante da abertura —
@@ -62,7 +78,15 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
       programa: {
         select: {
           id: true, nome: true, imagemUrl: true, corDestaque: true,
+          anunciosAtivos: true,
           equipe: { select: { id: true, nome: true, imagemUrl: true } },
+          campanhaPatrocinadora: {
+            select: {
+              status: true, inicioEm: true, fimEm: true,
+              anunciante: { select: { nome: true } },
+              criativos: { select: { tipo: true, url: true } },
+            },
+          },
         },
       },
       locutor: { select: { id: true, nome: true, imagemUrl: true } },
@@ -73,7 +97,10 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
     ? await prisma.momento.findFirst({
         where: { edicaoId: edicao.id, estado: 'ATIVO', inicioEm: { lte: agora }, fimEm: { gte: agora } },
         orderBy: { inicioEm: 'desc' },
-        include: { opcoes: { orderBy: { ordem: 'asc' }, select: { id: true, rotulo: true, emoji: true } } },
+        include: {
+          opcoes: { orderBy: { ordem: 'asc' }, select: { id: true, rotulo: true, emoji: true } },
+          ...incluirApresentacao,
+        },
       })
     : null
 
@@ -95,7 +122,14 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
   return {
     emissora: { slug: emissora.slug, nome: emissora.nome },
     aoVivo: Boolean(edicao),
-    programa: edicao?.programa ?? null,
+    programa: edicao
+      ? {
+          id: edicao.programa.id,
+          nome: edicao.programa.nome,
+          imagemUrl: edicao.programa.imagemUrl,
+          corDestaque: edicao.programa.corDestaque,
+        }
+      : null,
     locutor: edicao?.locutor ?? null,
     // O titular abre a lista: "A Hora do Ronco, com Tadeu, Emerson e Pedro Luiz" —
     // quem assina vem primeiro, sempre.
@@ -106,6 +140,18 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
         ]
       : [],
     edicaoId: edicao?.id ?? null,
+    // A vigência é conferida aqui, e não só na hora de escolher a campanha no Studio.
+    // O Estado No Ar fica em cache e o programa vai ao ar todo dia: sem esta checagem,
+    // uma campanha que venceu ontem continuaria assinando o programa hoje.
+    patrocinioDoPrograma: (() => {
+      const c = edicao?.programa.campanhaPatrocinadora
+      if (!c || c.status !== 'ATIVA' || c.inicioEm > agora || c.fimEm < agora) return null
+      return {
+        nome: c.anunciante.nome,
+        logoUrl: c.criativos.find((k) => k.tipo === 'imagem')?.url ?? null,
+      }
+    })(),
+    anunciosAtivos: edicao?.programa.anunciosAtivos ?? true,
     termina: edicao?.fimEm.toISOString() ?? null,
     momento: momento
       ? {
@@ -117,6 +163,8 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
           terminaEm: momento.fimEm.toISOString(),
           opcoes: momento.opcoes,
           patrocinada: Boolean(momento.campanhaPatrocinadoraId),
+          identidade: identidadeDe(momento),
+          patrocinio: patrocinioDe(momento),
           // O que o ouvinte pode ver do Fofocômetro agora — a revelação nunca entra
           // aqui, mas o patrocinador sim: ele comprou justamente a espera.
           //
