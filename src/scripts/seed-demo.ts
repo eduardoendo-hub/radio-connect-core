@@ -342,7 +342,7 @@ async function main() {
       edicoesCriadas++
     }
   }
-  console.log(`  ${edicoesCriadas} edições (hoje e amanhã, dias úteis)`)
+  console.log(`  ${edicoesCriadas} edições novas (hoje e amanhã)`)
 
   // ── Templates: criar um Momento em menos de 20 segundos ────
   const templates = [
