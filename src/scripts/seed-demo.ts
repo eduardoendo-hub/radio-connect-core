@@ -92,6 +92,12 @@ async function main() {
     { nome: 'Paulo Gomes', bio: 'Estação Band FM.' },
     { nome: 'Maicon Sales', bio: 'Estação Band FM.' },
     { nome: 'Marcelo Dias', bio: 'A noite tem nome e voz.' },
+    // O documento da emissora não traz nomes para sábado e domingo — são dias de
+    // plantão, com a escala definida na semana. Em vez de deixar a grade vazia (o app
+    // ficaria mudo dois dias por semana) ou inventar uma pessoa que não existe, entra
+    // um locutor de plantão: honesto sobre o que é, e substituível por nome real
+    // assim que a rádio informar quem entrou.
+    { nome: 'Plantão Band FM', bio: 'A equipe que segura o fim de semana.' },
   ]
   const locutores: Record<string, string> = {}
   for (const l of locutoresBase) {
@@ -148,10 +154,59 @@ async function main() {
     { nome: 'Band Love', equipe: ['Marcelo Dias'], inicio: '22:00', fim: '23:59', cor: '#1E4FD8' },
   ]
 
+  // ── Sábado e domingo ───────────────────────────────────────
+  //
+  // O documento traz a grade completa dos dois dias, mas sem locutor: são dias de
+  // plantão. A programação existe e o app precisa dela — sem isso a rádio ficava muda
+  // dois dias por semana, justamente quando a audiência de rádio popular cresce.
+  //
+  // Os SUPER 6 seguem a mesma regra dos dias úteis: preenchem a hora cheia entre dois
+  // programas.
+  const PLANTAO = ['Plantão Band FM']
+
+  const sabado: Bloco[] = [
+    { nome: 'Band Coruja', equipe: PLANTAO, inicio: '01:00', fim: '05:00', cor: '#1E4FD8' },
+    { nome: 'Band Bom Dia', equipe: PLANTAO, inicio: '05:00', fim: '07:00', cor: '#F6821F' },
+    { nome: 'Top 5 · A Hora do Ronco', equipe: PLANTAO, inicio: '07:00', fim: '09:00', cor: '#F6821F' },
+    { nome: 'Manhã Show', equipe: PLANTAO, inicio: '09:00', fim: '11:00', cor: '#22A06B' },
+    { nome: 'Super 6', equipe: PLANTAO, inicio: '11:00', fim: '12:00', cor: '#E3271E', chave: 'Super 6 · 11h' },
+    { nome: 'Festa da Band', equipe: PLANTAO, inicio: '12:00', fim: '14:00', cor: '#D6336C' },
+    { nome: 'Super 6', equipe: PLANTAO, inicio: '14:00', fim: '15:00', cor: '#E3271E', chave: 'Super 6 · 14h' },
+    { nome: 'Hora Cheia', equipe: PLANTAO, inicio: '15:00', fim: '16:00', cor: '#6E56CF' },
+    { nome: 'Dá Play', equipe: PLANTAO, inicio: '16:00', fim: '18:00', cor: '#22A06B' },
+    { nome: 'Band ao Vivo', equipe: PLANTAO, inicio: '18:00', fim: '19:00', cor: '#E3271E' },
+    { nome: 'Super 6', equipe: PLANTAO, inicio: '19:00', fim: '20:00', cor: '#E3271E', chave: 'Super 6 · 19h' },
+    { nome: 'Hora Cheia', equipe: PLANTAO, inicio: '20:00', fim: '21:00', cor: '#6E56CF', chave: 'Hora Cheia · 20h' },
+    { nome: 'Pista da Band', equipe: PLANTAO, inicio: '21:00', fim: '23:59', cor: '#1E4FD8' },
+  ]
+
+  const domingo: Bloco[] = [
+    { nome: 'Band Coruja', equipe: PLANTAO, inicio: '00:00', fim: '05:00', cor: '#1E4FD8' },
+    { nome: 'Band Bom Dia', equipe: PLANTAO, inicio: '05:00', fim: '07:00', cor: '#F6821F' },
+    { nome: 'Estação Band FM', equipe: PLANTAO, inicio: '07:00', fim: '09:00', cor: '#6E56CF' },
+    { nome: 'Band ao Vivo', equipe: PLANTAO, inicio: '09:00', fim: '11:00', cor: '#E3271E' },
+    { nome: 'Super 6', equipe: PLANTAO, inicio: '11:00', fim: '12:00', cor: '#E3271E', chave: 'Super 6 · 11h' },
+    { nome: 'Festa da Band', equipe: PLANTAO, inicio: '12:00', fim: '15:00', cor: '#D6336C' },
+    { nome: 'As Mais Pedidas da Semana', equipe: PLANTAO, inicio: '15:00', fim: '16:00', cor: '#22A06B' },
+    { nome: 'Dá Play', equipe: PLANTAO, inicio: '16:00', fim: '18:00', cor: '#22A06B' },
+    { nome: 'Band ao Vivo', equipe: PLANTAO, inicio: '18:00', fim: '19:00', cor: '#E3271E', chave: 'Band ao Vivo · 18h' },
+    { nome: 'Super 6', equipe: PLANTAO, inicio: '19:00', fim: '20:00', cor: '#E3271E', chave: 'Super 6 · 19h' },
+    { nome: 'As Mais Pedidas da Semana', equipe: PLANTAO, inicio: '20:00', fim: '21:00', cor: '#22A06B', chave: 'As Mais Pedidas · 20h' },
+    { nome: 'Band Love', equipe: PLANTAO, inicio: '21:00', fim: '23:59', cor: '#1E4FD8' },
+  ]
+
+  /// A grade completa, com os dias em que cada faixa toca.
+  /// 0 = domingo. Dias úteis são 1 a 5.
+  const semana: { bloco: Bloco; dias: number[] }[] = [
+    ...grade.map((bloco) => ({ bloco, dias: [1, 2, 3, 4, 5] })),
+    ...sabado.map((bloco) => ({ bloco, dias: [6] })),
+    ...domingo.map((bloco) => ({ bloco, dias: [0] })),
+  ]
+
   // Um Programa por nome; um SlotGrade por faixa de horário. É a diferença entre a
   // identidade ("Super 6") e a recorrência ("Super 6, das 13h às 14h").
   const programas: Record<string, string> = {}
-  for (const g of grade) {
+  for (const { bloco: g, dias } of semana) {
     if (!programas[g.nome]) {
       const existente = await db.programa.findFirst({ where: { emissoraId: emissora.id, nome: g.nome } })
       const titular = locutores[g.equipe[0]!]!
@@ -183,9 +238,7 @@ async function main() {
       programas[g.nome] = p.id
     }
 
-    // Segunda a sexta: dias 1 a 5. Sábado e domingo têm grade própria, que entra
-    // quando a emissora mandar a escala do fim de semana.
-    for (let dia = 1; dia <= 5; dia++) {
+    for (const dia of dias) {
       const jaTem = await db.slotGrade.findFirst({
         where: {
           emissoraId: emissora.id,
@@ -207,7 +260,7 @@ async function main() {
       }
     }
   }
-  console.log(`  ${Object.keys(programas).length} programas, ${grade.length} faixas na grade útil`)
+  console.log(`  ${Object.keys(programas).length} programas · ${grade.length} faixas úteis · ${sabado.length} no sábado · ${domingo.length} no domingo`)
 
   // ── Aposenta a grade inventada ─────────────────────────────
   //
@@ -256,10 +309,13 @@ async function main() {
   for (const desloc of [0, 1]) {
     const dia = new Date()
     dia.setDate(dia.getDate() + desloc)
-    // Fim de semana ainda não tem escala; sem isso a demo abriria num sábado vazio.
-    if (dia.getDay() === 0 || dia.getDay() === 6) continue
+    const diaSemana = dia.getDay()
 
-    for (const g of grade) {
+    // Cada dia tem a sua grade. Antes o fim de semana era pulado, e a demonstração
+    // aberta num sábado mostrava um app sem programa nenhum.
+    const doDia = semana.filter((x) => x.dias.includes(diaSemana)).map((x) => x.bloco)
+
+    for (const g of doDia) {
       const [hi, mi] = g.inicio.split(':').map(Number)
       const [hf, mf] = g.fim.split(':').map(Number)
       const inicioEm = new Date(dia); inicioEm.setHours(hi!, mi!, 0, 0)
