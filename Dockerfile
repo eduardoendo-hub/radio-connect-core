@@ -34,9 +34,6 @@ COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/assets ./assets
 COPY package.json ./
 
-# PONTUAL — sai depois de o De Pertinho voltar ao ar.
-ENV SEMEAR_DEMO=1
-
 EXPOSE 3000
 
 # Aplica migrações pendentes e sobe a aplicação.
