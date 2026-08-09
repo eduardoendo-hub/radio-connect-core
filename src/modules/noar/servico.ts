@@ -98,6 +98,18 @@ function encurtarNome(nome: string | null) {
   return `${partes[0]} ${partes[partes.length - 1]![0]!.toUpperCase()}.`
 }
 
+/** O que o bloco da promoção precisa desenhar. Usado nas duas consultas. */
+const CAMPOS_DA_PROMOCAO = {
+  id: true, titulo: true, descricao: true, imagemUrl: true, seloUrl: true,
+  sorteioEm: true, resultado: true,
+  campanhaPatrocinadora: {
+    select: {
+      anunciante: { select: { nome: true } },
+      criativos: { select: { tipo: true, url: true } },
+    },
+  },
+} as const
+
 /** Monta o estado a partir do banco. Chamado só quando algo muda. */
 export async function calcular(emissora: { id: string; slug: string; nome: string }): Promise<EstadoNoAr> {
   const agora = new Date()
@@ -143,29 +155,27 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
   // ganhou e encontraria uma tela sem nada — a rádio teria criado uma expectativa e
   // apagado a resposta. Duas horas é o tempo em que ainda se fala do assunto.
   //
-  // Promoção nova ganha do resultado antigo: `inicioEm desc` já resolve, porque a que
-  // está no ar sempre começou depois da que já foi sorteada.
+  // **A promoção ativa sempre ganha da sorteada**, e isso é uma consulta separada e não
+  // uma ordenação.
+  //
+  // Eu tinha juntado as duas num `OR` ordenado por data de início, supondo que a que
+  // está no ar sempre começou depois da que já foi sorteada. É falso: uma promoção
+  // criada hoje e sorteada em seguida começou *depois* da que está no ar há uma hora —
+  // e o bloco principal passou a mostrar um resultado velho no lugar da promoção viva.
+  // Só apareceu porque eu fui olhar.
   const doisAtras = new Date(agora.getTime() - 2 * 60 * 60 * 1000)
-  const promocao = await prisma.promocao.findFirst({
-    where: {
-      inicioEm: { lte: agora },
-      OR: [
-        { fimEm: { gte: agora } },
-        { resultado: { not: null }, fimEm: { gte: doisAtras } },
-      ],
-    },
-    orderBy: { inicioEm: 'desc' },
-    select: {
-      id: true, titulo: true, descricao: true, imagemUrl: true, seloUrl: true, sorteioEm: true,
-      resultado: true,
-      campanhaPatrocinadora: {
-        select: {
-          anunciante: { select: { nome: true } },
-          criativos: { select: { tipo: true, url: true } },
-        },
-      },
-    },
-  })
+  const promocao =
+    (await prisma.promocao.findFirst({
+      where: { inicioEm: { lte: agora }, fimEm: { gte: agora } },
+      orderBy: { inicioEm: 'desc' },
+      select: CAMPOS_DA_PROMOCAO,
+    })) ??
+    (await prisma.promocao.findFirst({
+      where: { resultado: { not: null }, fimEm: { gte: doisAtras, lte: agora } },
+      orderBy: { fimEm: 'desc' },
+      select: CAMPOS_DA_PROMOCAO,
+    }))
+
 
   const proxima = await prisma.edicao.findFirst({
     where: { inicioEm: { gt: agora } },
