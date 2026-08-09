@@ -31,6 +31,13 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY package.json ./
 
+# PONTUAL — sai no próximo commit.
+#
+# A chave definitiva é a variável `SEMEAR_DEMO` no Coolify; enquanto ela não estiver
+# definida lá, esta linha semeia a demonstração uma vez para a identidade dos quadros e
+# o patrocínio do programa entrarem no ar.
+ENV SEMEAR_DEMO=1
+
 EXPOSE 3000
 
 # Aplica migrações pendentes e sobe a aplicação.
