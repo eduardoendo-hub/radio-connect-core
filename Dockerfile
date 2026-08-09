@@ -31,9 +31,6 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY package.json ./
 
-# PONTUAL — sai assim que a assinatura do programa estiver conferida na tela.
-ENV SEMEAR_DEMO=1
-
 EXPOSE 3000
 
 # Aplica migrações pendentes e sobe a aplicação.
