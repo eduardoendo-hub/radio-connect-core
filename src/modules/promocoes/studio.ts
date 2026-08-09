@@ -193,6 +193,37 @@ rotasPromocoesStudio.post('/promocoes/:id/encerrar', exigirOperador(), async (re
   }
 })
 
+/**
+ * Apagar — só o que ninguém tocou.
+ *
+ * Promoção com inscrito não se apaga: aquilo é registro de gente que participou, e
+ * sumir com ele é o tipo de coisa que a emissora vai precisar provar depois. Para tirar
+ * do ar existe o Encerrar.
+ *
+ * Já a promoção criada errada — título trocado, publicada por engano, teste — não
+ * merece ficar no histórico para sempre. Com zero inscritos não há o que perder.
+ */
+rotasPromocoesStudio.delete('/promocoes/:id', exigirOperador(), async (req, res, next) => {
+  try {
+    const promocao = await prisma.promocao.findFirst({
+      where: { id: req.params.id },
+      include: { _count: { select: { participacoes: true } } },
+    })
+    if (!promocao) throw erros.naoEncontrado('Promoção')
+
+    if (promocao._count.participacoes > 0) {
+      throw new ErroDaApi(409, 'tem_inscritos',
+        `${promocao._count.participacoes} pessoa(s) já se inscreveram — esta promoção não pode ser apagada. Use Encerrar.`)
+    }
+
+    await prisma.promocao.delete({ where: { id: promocao.id } })
+    await recalcular(req.emissora!)
+    res.json({ apagada: true })
+  } catch (e) {
+    next(e)
+  }
+})
+
 const ORDEM = { no_ar: 0, agendada: 1, encerrada: 2, sorteada: 3 } as const
 function ordem(estado: keyof typeof ORDEM) {
   return ORDEM[estado]
