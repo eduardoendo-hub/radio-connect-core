@@ -31,11 +31,6 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY package.json ./
 
-# PONTUAL — sai no próximo commit. Ver o commit anterior de mesmo nome: a primeira
-# semeadura não aplicou as cores dos quadros e a falha foi engolida em silêncio, que é
-# a razão de o `|| echo` existir agora.
-ENV SEMEAR_DEMO=1
-
 EXPOSE 3000
 
 # Aplica migrações pendentes e sobe a aplicação.
