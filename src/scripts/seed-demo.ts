@@ -536,15 +536,20 @@ async function main() {
   // dura três minutos.
   //
   // "A Hora do Ronco" é o horário nobre da manhã — é o que a emissora venderia primeiro.
-  const patrocinado = await db.programa.findFirst({
-    where: { emissoraId: emissora.id, nome: 'A Hora do Ronco' },
-  })
-  if (patrocinado) {
+  //
+  // "Estação Band FM" entra junto porque é o único programa da grade que existe nos
+  // três dias — útil, sábado e domingo. Sem ele a assinatura só apareceria entre 6h e
+  // 9h de um dia de semana, e um recurso que só dá para mostrar numa janela de três
+  // horas é um recurso que ninguém vai ver.
+  const PATROCINADOS = ['A Hora do Ronco', 'Estação Band FM']
+  for (const nome of PATROCINADOS) {
+    const p = await db.programa.findFirst({ where: { emissoraId: emissora.id, nome } })
+    if (!p) continue
     await db.programa.update({
-      where: { id: patrocinado.id },
+      where: { id: p.id },
       data: { campanhaPatrocinadoraId: campanhaSoneda.id },
     })
-    console.log('  A Hora do Ronco é um oferecimento Soneda')
+    console.log(`  ${nome} é um oferecimento Soneda`)
   }
 
   // O horário político eleitoral não tem programa — mas se um dia tiver, a publicidade
