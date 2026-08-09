@@ -172,6 +172,7 @@ function paraTela(p: {
     descricao: p.descricao,
     regras: p.regras,
     imagemUrl: p.imagemUrl,
+    seloUrl: p.seloUrl ?? null,
     inicioEm: p.inicioEm.toISOString(),
     fimEm: p.fimEm.toISOString(),
     sorteioEm: p.sorteioEm?.toISOString() ?? null,

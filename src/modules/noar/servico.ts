@@ -73,6 +73,7 @@ export type EstadoNoAr = {
     titulo: string
     descricao: string | null
     imagemUrl: string | null
+    seloUrl: string | null
     sorteioEm: string | null
     patrocinio: Patrocinio
   } | null
@@ -123,7 +124,7 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
     where: { inicioEm: { lte: agora }, fimEm: { gte: agora } },
     orderBy: { inicioEm: 'desc' },
     select: {
-      id: true, titulo: true, descricao: true, imagemUrl: true, sorteioEm: true,
+      id: true, titulo: true, descricao: true, imagemUrl: true, seloUrl: true, sorteioEm: true,
       campanhaPatrocinadora: {
         select: {
           anunciante: { select: { nome: true } },
@@ -213,6 +214,7 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
           titulo: promocao.titulo,
           descricao: promocao.descricao,
           imagemUrl: promocao.imagemUrl,
+          seloUrl: promocao.seloUrl,
           sorteioEm: promocao.sorteioEm?.toISOString() ?? null,
           patrocinio: patrocinioDe(promocao),
         }

@@ -460,6 +460,13 @@ model Promocao {
   regras    String?
   imagemUrl String?
 
+  /// A marca da promoção — "De Pertinho", "Baladão", "Hora do Ronco Premiado".
+  ///
+  /// Separada da arte porque são coisas diferentes: `imagemUrl` muda a cada edição (o
+  /// artista do mês), o selo é o que se repete e o que o ouvinte reconhece. É a mesma
+  /// distinção entre a foto do programa e o logotipo do quadro.
+  seloUrl String?
+
   inicioEm DateTime
   fimEm    DateTime
 

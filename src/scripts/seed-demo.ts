@@ -644,6 +644,7 @@ async function main() {
   // traz a pessoa de volta — com o rádio ligado, que é o que a emissora vende — é saber
   // que quinta às 15h o locutor vai dizer um nome ao vivo.
   const arte = await subirArte(emissora.id, 'promo-ze-neto-cristiano.jpg', 'image/jpeg')
+  const selo = await subirArte(emissora.id, 'selo-de-pertinho.png', 'image/png')
 
   const quinta = (() => {
     const d = new Date()
@@ -665,6 +666,7 @@ async function main() {
       + 'nome do contemplado é anunciado pelo locutor. O prêmio é pessoal e intransferível '
       + 'e dá direito a dois ingressos. Transporte e hospedagem não estão inclusos.',
     imagemUrl: arte,
+    seloUrl: selo,
     inicioEm: new Date(Date.now() - 3600_000),
     fimEm: quinta,
     sorteioEm: quinta,
