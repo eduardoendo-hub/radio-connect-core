@@ -1,4 +1,6 @@
 import bcrypt from 'bcryptjs'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { prismaSemEscopo as db } from '../lib/prisma.js'
 
 /**
@@ -529,28 +531,97 @@ async function main() {
   }
   console.log(`  campanha Soneda: banner ${bannerUrl ? 'ok' : '—'} · pré-roll ${prerollUrl ? 'ok' : '—'}`)
 
+  // ── Ituran: patrocinadora da programação ────────────────────
+  //
+  // Duas naturezas diferentes de venda convivendo, que é como a rádio vende de verdade:
+  // a Soneda compra **mídia** (banner, pré-roll) e assina Momentos avulsos; a Ituran
+  // compra **a programação** e assina os programas. Uma aparece na rolagem, a outra no
+  // cabeçalho, o dia inteiro.
+  //
+  // O logo vem do repositório, não de um envio manual. Conteúdo de demonstração que
+  // depende de alguém ter subido um arquivo à mão não sobrevive à primeira recriação
+  // do banco.
+  const ituran =
+    (await db.anunciante.findFirst({ where: { emissoraId: emissora.id, nome: 'Ituran' } })) ??
+    (await db.anunciante.create({
+      data: { emissoraId: emissora.id, nome: 'Ituran', contato: 'comercial@ituran.com.br' },
+    }))
+
+  const campanhaIturan =
+    (await db.campanha.findFirst({ where: { emissoraId: emissora.id, nome: 'Ituran · Programação' } })) ??
+    (await db.campanha.create({
+      data: {
+        emissoraId: emissora.id,
+        anuncianteId: ituran.id,
+        nome: 'Ituran · Programação',
+        formato: 'programa_patrocinado',
+        status: 'ATIVA',
+        inicioEm: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        fimEm: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        vendidoPor: 'RADIO',
+      },
+    }))
+
+  let logoIturan = await db.arquivo.findFirst({
+    where: { emissoraId: emissora.id, nome: 'logo-ituran.png' },
+  })
+  if (!logoIturan) {
+    const dados = readFileSync(join(import.meta.dirname, '../../assets/logo-ituran.png'))
+    logoIturan = await db.arquivo.create({
+      data: {
+        emissoraId: emissora.id,
+        nome: 'logo-ituran.png',
+        tipoMime: 'image/png',
+        bytes: dados.byteLength,
+        dados,
+      },
+    })
+  }
+  const urlLogoIturan = `${process.env.API_URL_PUBLICA ?? 'https://api.radioconnect.technowhub.ai'}/v1/midia/${logoIturan.id}`
+
+  const criativoIturan = await db.criativo.findFirst({
+    where: { campanhaId: campanhaIturan.id, tipo: 'imagem' },
+  })
+  if (criativoIturan) {
+    await db.criativo.update({ where: { id: criativoIturan.id }, data: { url: urlLogoIturan } })
+  } else {
+    await db.criativo.create({
+      data: {
+        campanhaId: campanhaIturan.id,
+        tipo: 'imagem',
+        url: urlLogoIturan,
+        clickUrl: 'https://www.ituran.com.br',
+        // "assinatura" não é uma posição que alguém peça — e é isso que se quer.
+        //
+        // Cuidado com a intuição aqui: lista VAZIA em `posicoes` significa "serve em
+        // qualquer posição", não "em nenhuma". Deixar vazio poria este logo na rotação
+        // de banner, onde um PNG transparente de 600px viraria um borrão sobre o fundo
+        // preto — e a Ituran apareceria em dois lugares ao mesmo tempo, perdendo o que
+        // torna a assinatura cara: ser a única marca no cabeçalho.
+        posicoes: ['assinatura'],
+      },
+    })
+  }
+  console.log(`  campanha Ituran: logo ${logoIturan.id}`)
+
   // ── Programa patrocinado ────────────────────────────────────
   //
   // O inventário mais caro que a rádio tem: um programa roda três horas por dia, todo
   // dia útil, e a assinatura fica no cabeçalho o tempo inteiro. Um Momento patrocinado
   // dura três minutos.
   //
-  // "A Hora do Ronco" é o horário nobre da manhã — é o que a emissora venderia primeiro.
+  // A Ituran assina a grade inteira — é uma venda que existe: patrocínio de
+  // programação, não de programa. Também é o que torna a assinatura visível a qualquer
+  // hora, em vez de só na janela de um programa específico.
   //
-  // "Estação Band FM" entra junto porque é o único programa da grade que existe nos
-  // três dias — útil, sábado e domingo. Sem ele a assinatura só apareceria entre 6h e
-  // 9h de um dia de semana, e um recurso que só dá para mostrar numa janela de três
-  // horas é um recurso que ninguém vai ver.
-  const PATROCINADOS = ['A Hora do Ronco', 'Estação Band FM']
-  for (const nome of PATROCINADOS) {
-    const p = await db.programa.findFirst({ where: { emissoraId: emissora.id, nome } })
-    if (!p) continue
-    await db.programa.update({
-      where: { id: p.id },
-      data: { campanhaPatrocinadoraId: campanhaSoneda.id },
-    })
-    console.log(`  ${nome} é um oferecimento Soneda`)
-  }
+  // `campanhaPatrocinadoraId` é único por programa: quem assina o cabeçalho é um só.
+  // Dois patrocinadores no mesmo lugar é o problema que a regra de uma assinatura por
+  // tela existe para evitar.
+  const assinados = await db.programa.updateMany({
+    where: { emissoraId: emissora.id },
+    data: { campanhaPatrocinadoraId: campanhaIturan.id },
+  })
+  console.log(`  ${assinados.count} programas são um oferecimento Ituran`)
 
   // O horário político eleitoral não tem programa — mas se um dia tiver, a publicidade
   // fica desligada nele. O campo existe para essa decisão ser dado, e não código.

@@ -14,6 +14,8 @@ RUN npx prisma generate
 
 COPY tsconfig.json ./
 COPY src ./src
+# Imagens que o seed precisa ter em mãos — logo de patrocinador da demonstração.
+COPY assets ./assets
 RUN npm run build
 
 RUN npm prune --omit=dev
@@ -29,7 +31,11 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && r
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/assets ./assets
 COPY package.json ./
+
+# PONTUAL — sai assim que a Ituran estiver conferida na tela.
+ENV SEMEAR_DEMO=1
 
 EXPOSE 3000
 
