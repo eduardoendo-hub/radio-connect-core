@@ -35,13 +35,12 @@ EXPOSE 3000
 
 # Aplica migrações pendentes e sobe a aplicação.
 #
-# O `resolve` na frente é PONTUAL e sai no próximo commit. A migração
-# `20260808150000_publicidade_por_programa` foi escrita com o nome do modelo
-# ("Programa") no lugar do nome da tabela ("programas") e falhou ao aplicar. O Postgres
-# roda cada arquivo de migração numa transação, então ela falhou no primeiro comando e
-# não deixou nada aplicado — o banco está intacto. Mas o Prisma gravou a migração como
-# falha, e a partir daí todo `migrate deploy` aborta com P3009 e o container não sobe.
+# Com `SEMEAR_DEMO=1`, roda o seed antes de subir. Serve à rádio de demonstração, cujo
+# conteúdo — grade, identidade dos quadros, patrocínios — mora no seed e precisa
+# convergir a cada mudança. O seed é idempotente de propósito, então repetir a cada
+# subida é seguro e é justamente o que mantém o ambiente igual ao que está no código.
 #
-# Marcá-la como revertida é literalmente o que aconteceu. O `|| true` existe porque na
-# segunda subida ela já não estará em estado de falha.
-CMD ["sh", "-c", "npx prisma migrate resolve --rolled-back 20260808150000_publicidade_por_programa || true; npx prisma migrate deploy && node dist/server.js"]
+# Fica desligado por padrão: numa emissora de verdade o seed não pode encostar no banco.
+# A alternativa era editar este CMD à mão toda vez que o conteúdo mudasse, que foi o que
+# eu vinha fazendo — e é assim que se esquece de desfazer.
+CMD ["sh", "-c", "npx prisma migrate deploy && { [ \"$SEMEAR_DEMO\" = \"1\" ] && node dist/scripts/seed-demo.js; :; } && node dist/server.js"]
