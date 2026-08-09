@@ -463,6 +463,14 @@ model Promocao {
   inicioEm DateTime
   fimEm    DateTime
 
+  /// Quando o sorteio acontece — e não quando a promoção sai do ar.
+  ///
+  /// São coisas diferentes e é o sorteio que move a audiência: a inscrição é um toque
+  /// e acaba ali, mas "quinta, 15h, ao vivo com o locutor" é o que traz a pessoa de
+  /// volta com o rádio ligado. Sem esta data não há contagem nem aviso, e a promoção
+  /// vira um formulário que a pessoa preenche e esquece.
+  sorteioEm DateTime?
+
   /// Elegibilidade opcional por Índice de Conexão (DP-19)
   scoreMinimo Int?
 

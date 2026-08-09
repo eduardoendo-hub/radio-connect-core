@@ -22,6 +22,29 @@ const CORES = {
   aoVivo: '#E0342A', // o vermelho do "AO VIVO" — reservado, significa "acontecendo agora"
 }
 
+const API_PUBLICA = process.env.API_URL_PUBLICA ?? 'https://api.radioconnect.technowhub.ai'
+
+/**
+ * Põe uma arte do repositório dentro do banco e devolve a URL pública dela.
+ *
+ * As imagens da demonstração moram em `assets/` e não numa pasta do servidor: o
+ * contêiner é efêmero e o que estiver só no disco dele some no próximo deploy. Já
+ * aconteceu — o criativo da Soneda sumiu num recriar de banco porque tinha sido
+ * enviado à mão pelo Studio.
+ *
+ * Idempotente pelo nome do arquivo, como todo o resto do seed.
+ */
+async function subirArte(emissoraId: string, nome: string, tipoMime: string) {
+  let arquivo = await db.arquivo.findFirst({ where: { emissoraId, nome } })
+  if (!arquivo) {
+    const dados = readFileSync(join(import.meta.dirname, '../../assets', nome))
+    arquivo = await db.arquivo.create({
+      data: { emissoraId, nome, tipoMime, bytes: dados.byteLength, dados },
+    })
+  }
+  return `${API_PUBLICA}/v1/midia/${arquivo.id}`
+}
+
 async function main() {
   console.log('semeando a rádio de demonstração…')
 
@@ -562,22 +585,7 @@ async function main() {
       },
     }))
 
-  let logoIturan = await db.arquivo.findFirst({
-    where: { emissoraId: emissora.id, nome: 'logo-ituran.png' },
-  })
-  if (!logoIturan) {
-    const dados = readFileSync(join(import.meta.dirname, '../../assets/logo-ituran.png'))
-    logoIturan = await db.arquivo.create({
-      data: {
-        emissoraId: emissora.id,
-        nome: 'logo-ituran.png',
-        tipoMime: 'image/png',
-        bytes: dados.byteLength,
-        dados,
-      },
-    })
-  }
-  const urlLogoIturan = `${process.env.API_URL_PUBLICA ?? 'https://api.radioconnect.technowhub.ai'}/v1/midia/${logoIturan.id}`
+  const urlLogoIturan = await subirArte(emissora.id, 'logo-ituran.png', 'image/png')
 
   const criativoIturan = await db.criativo.findFirst({
     where: { campanhaId: campanhaIturan.id, tipo: 'imagem' },
@@ -602,7 +610,7 @@ async function main() {
       },
     })
   }
-  console.log(`  campanha Ituran: logo ${logoIturan.id}`)
+  console.log('  campanha Ituran: logo no ar')
 
   // ── Programa patrocinado ────────────────────────────────────
   //
@@ -626,21 +634,56 @@ async function main() {
   // O horário político eleitoral não tem programa — mas se um dia tiver, a publicidade
   // fica desligada nele. O campo existe para essa decisão ser dado, e não código.
 
-  const jaTemPromo = await db.promocao.findFirst({ where: { emissoraId: emissora.id, titulo: { contains: 'ingressos' } } })
-  if (!jaTemPromo) {
-    await db.promocao.create({
-      data: {
-        emissoraId: emissora.id,
-        titulo: 'Dois ingressos para o Baladão Band FM',
-        descricao: 'Participe e concorra a um par de ingressos com acesso ao camarote.',
-        regras: 'Válido para maiores de 18 anos. Sorteio ao vivo na sexta-feira.',
-        inicioEm: new Date(),
-        fimEm: new Date(Date.now() + 5 * 86400000),
-        campanhaPatrocinadoraId: campanha.id,
-      },
-    })
+  // ── De Pertinho ─────────────────────────────────────────────
+  //
+  // A promoção real da emissora: o ouvinte entra na Band e vê o artista de perto, num
+  // show fechado. É o formato de maior IBOPE que a rádio tem, e por isso ele ganhou o
+  // bloco principal da tela em vez de uma linha de lista.
+  //
+  // O sorteio tem hora marcada de propósito. A inscrição é um toque e acaba ali; o que
+  // traz a pessoa de volta — com o rádio ligado, que é o que a emissora vende — é saber
+  // que quinta às 15h o locutor vai dizer um nome ao vivo.
+  const arte = await subirArte(emissora.id, 'promo-ze-neto-cristiano.jpg', 'image/jpeg')
+
+  const quinta = (() => {
+    const d = new Date()
+    d.setHours(15, 0, 0, 0)
+    // 4 = quinta. Se hoje já é quinta e passou das 15h, vai para a próxima.
+    while (d.getDay() !== 4 || d <= new Date()) d.setDate(d.getDate() + 1)
+    return d
+  })()
+
+  const dePertinho = await db.promocao.findFirst({
+    where: { emissoraId: emissora.id, titulo: { contains: 'De Pertinho' } },
+  })
+  const dadosDePertinho = {
+    titulo: 'De Pertinho com Zé Neto e Cristiano',
+    descricao: 'Você e um acompanhante dentro da Band, num show exclusivo para poucos.',
+    regras:
+      'Promoção válida para maiores de 18 anos em todo o território nacional. Cada ouvinte '
+      + 'concorre uma única vez. O sorteio acontece ao vivo, na quinta-feira às 15h, e o '
+      + 'nome do contemplado é anunciado pelo locutor. O prêmio é pessoal e intransferível '
+      + 'e dá direito a dois ingressos. Transporte e hospedagem não estão inclusos.',
+    imagemUrl: arte,
+    inicioEm: new Date(Date.now() - 3600_000),
+    fimEm: quinta,
+    sorteioEm: quinta,
   }
-  console.log('  anunciante, campanha e promoção patrocinada')
+  if (dePertinho) {
+    await db.promocao.update({ where: { id: dePertinho.id }, data: dadosDePertinho })
+  } else {
+    await db.promocao.create({ data: { emissoraId: emissora.id, ...dadosDePertinho } })
+  }
+
+  // A do Baladão sai de cartaz: duas promoções ativas ao mesmo tempo brigariam pelo
+  // mesmo bloco, e o No Ar mostra uma só — a mais recente ganharia por acaso, não por
+  // decisão. Fica no histórico de quem participou.
+  await db.promocao.updateMany({
+    where: { emissoraId: emissora.id, titulo: { contains: 'Baladão' }, fimEm: { gt: new Date() } },
+    data: { fimEm: new Date(Date.now() - 60_000) },
+  })
+  console.log(`  De Pertinho no ar · sorteio ${quinta.toLocaleString('pt-BR')}`)
+
 
   console.log('\npronto.')
   console.log(`  tenant: ${SLUG}`)

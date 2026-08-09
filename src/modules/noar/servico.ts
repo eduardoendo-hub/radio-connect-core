@@ -60,7 +60,22 @@ export type EstadoNoAr = {
       patrocinador: { nome: string; logoUrl: string | null } | null
     } | null
   } | null
-  promocao: { id: string; titulo: string; imagemUrl: string | null } | null
+  /**
+   * A promoção no ar.
+   *
+   * Leva mais do que o título porque agora ela é o bloco principal da tela, e não uma
+   * linha de lista: a arte, a chamada e a hora do sorteio são o que fazem a pessoa
+   * parar. O que NÃO vem aqui é se esta pessoa já se inscreveu — o Estado No Ar é o
+   * mesmo para toda a emissora e fica em cache; isso viria errado para todo mundo.
+   */
+  promocao: {
+    id: string
+    titulo: string
+    descricao: string | null
+    imagemUrl: string | null
+    sorteioEm: string | null
+    patrocinio: Patrocinio
+  } | null
   proxima: { nome: string; comeca: string } | null
   ouvintes: number
   versao: number
@@ -107,7 +122,15 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
   const promocao = await prisma.promocao.findFirst({
     where: { inicioEm: { lte: agora }, fimEm: { gte: agora } },
     orderBy: { inicioEm: 'desc' },
-    select: { id: true, titulo: true, imagemUrl: true },
+    select: {
+      id: true, titulo: true, descricao: true, imagemUrl: true, sorteioEm: true,
+      campanhaPatrocinadora: {
+        select: {
+          anunciante: { select: { nome: true } },
+          criativos: { select: { tipo: true, url: true } },
+        },
+      },
+    },
   })
 
   const proxima = await prisma.edicao.findFirst({
@@ -184,7 +207,16 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
             : null,
         }
       : null,
-    promocao: promocao ?? null,
+    promocao: promocao
+      ? {
+          id: promocao.id,
+          titulo: promocao.titulo,
+          descricao: promocao.descricao,
+          imagemUrl: promocao.imagemUrl,
+          sorteioEm: promocao.sorteioEm?.toISOString() ?? null,
+          patrocinio: patrocinioDe(promocao),
+        }
+      : null,
     proxima: proxima ? { nome: proxima.titulo ?? proxima.programa.nome, comeca: proxima.inicioEm.toISOString() } : null,
     ouvintes,
     versao,
