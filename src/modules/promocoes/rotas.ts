@@ -176,10 +176,28 @@ function paraTela(p: {
     inicioEm: p.inicioEm.toISOString(),
     fimEm: p.fimEm.toISOString(),
     sorteioEm: p.sorteioEm?.toISOString() ?? null,
-    resultado: p.resultado,
+    // O nome do contemplado sai encurtado: "Eduardo E.".
+    //
+    // A rádio diz o nome inteiro no ar e isso é do ofício dela — mas o ar some no
+    // segundo seguinte, e uma tela fica. Nome completo publicado ao lado de "ganhou um
+    // prêmio" é dado pessoal exposto para sempre, e ninguém concordou com isso ao tocar
+    // em "participar". O primeiro nome basta para a pessoa se reconhecer e para os
+    // outros entenderem que houve gente de verdade do outro lado.
+    //
+    // O nome inteiro e o telefone existem, e ficam no Studio, que é de quem precisa
+    // ligar para a pessoa.
+    resultado: encurtar(p.resultado),
     total: p._count?.participacoes ?? null,
     patrocinio: patrocinioDe(p),
   }
+}
+
+/** "Eduardo Endo" → "Eduardo E." */
+function encurtar(nome: string | null) {
+  if (!nome) return null
+  const partes = nome.trim().split(/\s+/)
+  if (partes.length === 1) return partes[0]
+  return `${partes[0]} ${partes[partes.length - 1]![0]!.toUpperCase()}.`
 }
 
 function estadoDe(minha: { participouEm: Date; vencedor: boolean } | null) {

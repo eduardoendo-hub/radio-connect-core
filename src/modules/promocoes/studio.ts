@@ -194,6 +194,77 @@ rotasPromocoesStudio.post('/promocoes/:id/encerrar', exigirOperador(), async (re
 })
 
 /**
+ * O sorteio.
+ *
+ * É o momento que a promoção inteira existe para chegar: o locutor abre o microfone e
+ * diz um nome. Antes disso tudo é expectativa; sem isso, a promoção termina em
+ * "concorrendo" e nunca vira história.
+ *
+ * Três decisões que valem mais que o código:
+ *
+ * **Sortear encerra.** Não são dois passos. Na rádio o locutor fecha as inscrições e
+ * sorteia no mesmo fôlego, e separar isso criaria a janela em que alguém se inscreve
+ * depois do nome já ter sido escolhido.
+ *
+ * **Não se sorteia duas vezes.** Um segundo sorteio invalidaria o primeiro nome — que
+ * já pode ter ido ao ar. Se a rádio precisar de outro contemplado (o primeiro não
+ * atendeu, por exemplo), isso é uma decisão editorial com registro próprio, não um
+ * botão que qualquer um aperta de novo.
+ *
+ * **O sorteio é do servidor.** Nunca do navegador de quem opera: prêmio decidido no
+ * cliente é prêmio que alguém pode escolher.
+ */
+rotasPromocoesStudio.post('/promocoes/:id/sortear', exigirOperador(), async (req, res, next) => {
+  try {
+    const promocao = await prisma.promocao.findFirst({ where: { id: req.params.id } })
+    if (!promocao) throw erros.naoEncontrado('Promoção')
+
+    if (promocao.resultado) {
+      throw new ErroDaApi(409, 'ja_sorteada',
+        `Esta promoção já foi sorteada — o contemplado é ${promocao.resultado}.`)
+    }
+
+    const participacoes = await prisma.participacaoPromocao.findMany({
+      where: { promocaoId: promocao.id },
+      include: { ouvinte: { select: { id: true, nome: true, telefone: true } } },
+    })
+
+    if (participacoes.length === 0) {
+      throw new ErroDaApi(422, 'sem_inscritos',
+        'Ninguém se inscreveu nesta promoção. Não há quem sortear.')
+    }
+
+    const escolhida = participacoes[Math.floor(Math.random() * participacoes.length)]!
+    const nome = escolhida.ouvinte.nome?.trim() || 'Ouvinte'
+
+    await prisma.$transaction([
+      prisma.participacaoPromocao.update({
+        where: { id: escolhida.id },
+        data: { vencedor: true },
+      }),
+      prisma.promocao.update({
+        where: { id: promocao.id },
+        data: { resultado: nome, fimEm: new Date() },
+      }),
+    ])
+    await recalcular(req.emissora!)
+
+    // O telefone volta só aqui, para o Studio: é como a produção chama a pessoa depois
+    // do ar. No aplicativo ele nunca aparece — ver `paraTela` nas rotas do ouvinte.
+    res.json({
+      vencedor: {
+        nome,
+        telefone: escolhida.ouvinte.telefone,
+        inscritoEm: escolhida.participouEm.toISOString(),
+      },
+      concorreram: participacoes.length,
+    })
+  } catch (e) {
+    next(e)
+  }
+})
+
+/**
  * Apagar — só o que ninguém tocou.
  *
  * Promoção com inscrito não se apaga: aquilo é registro de gente que participou, e
