@@ -98,6 +98,10 @@ rotasPromocoesStudio.get('/promocoes', exigirOperador(), async (req, res, next) 
           id: p.id,
           titulo: p.titulo,
           descricao: p.descricao,
+          // `regras` e a campanha vêm na lista de propósito: é o que o editor precisa
+          // para abrir já preenchido. Uma chamada a menos entre clicar e ver o texto.
+          regras: p.regras,
+          campanhaPatrocinadoraId: p.campanhaPatrocinadoraId,
           imagemUrl: p.imagemUrl,
           seloUrl: p.seloUrl,
           inicioEm: p.inicioEm.toISOString(),
@@ -117,6 +121,56 @@ rotasPromocoesStudio.get('/promocoes', exigirOperador(), async (req, res, next) 
         // No ar primeiro: é a que o produtor está operando agora e a que ele veio ver.
         .sort((a, b) => ordem(a.estado) - ordem(b.estado)),
     })
+  } catch (e) {
+    next(e)
+  }
+})
+
+/**
+ * Editar uma promoção que já está no ar.
+ *
+ * Corrigir texto, trocar a arte, adiar o sorteio — coisas que acontecem entre o
+ * produtor publicar e o locutor ler no ar. Antes só dava para encerrar e criar de novo,
+ * o que jogava fora quem já tinha se inscrito.
+ *
+ * Adiar o sorteio move o fim das inscrições junto, porque são a mesma coisa aqui.
+ */
+const editar = criar.partial()
+
+rotasPromocoesStudio.patch('/promocoes/:id', exigirOperador(), async (req, res, next) => {
+  try {
+    const dados = editar.parse(req.body)
+    const promocao = await prisma.promocao.findFirst({ where: { id: req.params.id } })
+    if (!promocao) throw erros.naoEncontrado('Promoção')
+
+    let sorteioEm: Date | undefined
+    if (dados.sorteioEm) {
+      sorteioEm = new Date(dados.sorteioEm)
+      if (Number.isNaN(sorteioEm.getTime())) {
+        throw erros.dadosInvalidos([{ campo: 'sorteioEm', problema: 'data inválida' }])
+      }
+      // Antecipar para o passado encerra na hora — e quem já se inscreveu fica sem
+      // sorteio. Se a intenção é essa, existe o botão de encerrar, que diz o que faz.
+      if (sorteioEm <= new Date()) {
+        throw new ErroDaApi(422, 'sorteio_no_passado',
+          'Para tirar do ar agora, use Encerrar — assim fica claro para quem se inscreveu.')
+      }
+    }
+
+    await prisma.promocao.update({
+      where: { id: promocao.id },
+      data: {
+        titulo: dados.titulo ?? undefined,
+        descricao: dados.descricao ?? undefined,
+        regras: dados.regras ?? undefined,
+        imagemUrl: dados.imagemUrl ?? undefined,
+        seloUrl: dados.seloUrl ?? undefined,
+        ...(sorteioEm ? { sorteioEm, fimEm: sorteioEm } : {}),
+        campanhaPatrocinadoraId: dados.campanhaPatrocinadoraId ?? undefined,
+      },
+    })
+    await recalcular(req.emissora!)
+    res.json({ atualizada: true })
   } catch (e) {
     next(e)
   }
