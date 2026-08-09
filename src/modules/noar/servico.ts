@@ -75,12 +75,27 @@ export type EstadoNoAr = {
     imagemUrl: string | null
     seloUrl: string | null
     sorteioEm: string | null
+    /// O contemplado, quando já houve sorteio. Nome encurtado — ver `rotas.ts`.
+    resultado: string | null
     patrocinio: Patrocinio
   } | null
   proxima: { nome: string; comeca: string } | null
   ouvintes: number
   versao: number
   calculadoEm: string
+}
+
+/**
+ * "Eduardo Endo" → "Eduardo E."
+ *
+ * A mesma regra das rotas do ouvinte, e pelo mesmo motivo: no ar vai o nome inteiro,
+ * na tela vai o suficiente para a pessoa se reconhecer. Ver `promocoes/rotas.ts`.
+ */
+function encurtarNome(nome: string | null) {
+  if (!nome) return null
+  const partes = nome.trim().split(/\s+/)
+  if (partes.length === 1) return partes[0]!
+  return `${partes[0]} ${partes[partes.length - 1]![0]!.toUpperCase()}.`
 }
 
 /** Monta o estado a partir do banco. Chamado só quando algo muda. */
@@ -120,11 +135,29 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
       })
     : null
 
+  // A promoção sai do bloco principal duas horas depois do sorteio, não no instante em
+  // que o locutor diz o nome.
+  //
+  // O sorteio é o momento que a promoção inteira existiu para chegar. Se ela sumisse
+  // junto com o resultado, quem estava ouvindo abriria o aplicativo para ver quem
+  // ganhou e encontraria uma tela sem nada — a rádio teria criado uma expectativa e
+  // apagado a resposta. Duas horas é o tempo em que ainda se fala do assunto.
+  //
+  // Promoção nova ganha do resultado antigo: `inicioEm desc` já resolve, porque a que
+  // está no ar sempre começou depois da que já foi sorteada.
+  const doisAtras = new Date(agora.getTime() - 2 * 60 * 60 * 1000)
   const promocao = await prisma.promocao.findFirst({
-    where: { inicioEm: { lte: agora }, fimEm: { gte: agora } },
+    where: {
+      inicioEm: { lte: agora },
+      OR: [
+        { fimEm: { gte: agora } },
+        { resultado: { not: null }, fimEm: { gte: doisAtras } },
+      ],
+    },
     orderBy: { inicioEm: 'desc' },
     select: {
       id: true, titulo: true, descricao: true, imagemUrl: true, seloUrl: true, sorteioEm: true,
+      resultado: true,
       campanhaPatrocinadora: {
         select: {
           anunciante: { select: { nome: true } },
@@ -216,6 +249,7 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
           imagemUrl: promocao.imagemUrl,
           seloUrl: promocao.seloUrl,
           sorteioEm: promocao.sorteioEm?.toISOString() ?? null,
+          resultado: encurtarNome(promocao.resultado),
           patrocinio: patrocinioDe(promocao),
         }
       : null,

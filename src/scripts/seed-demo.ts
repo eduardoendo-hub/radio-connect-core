@@ -670,9 +670,19 @@ async function main() {
     inicioEm: new Date(Date.now() - 3600_000),
     fimEm: quinta,
     sorteioEm: quinta,
+    // O seed converge: se alguém sorteou a promoção da demonstração testando, semear de
+    // novo a devolve ao ar. Sem isto ela ficava sorteada para sempre e o bloco
+    // principal do aplicativo ficava sem nada até alguém criar outra à mão.
+    resultado: null,
   }
   if (dePertinho) {
     await db.promocao.update({ where: { id: dePertinho.id }, data: dadosDePertinho })
+    // As participações do teste também: quem "ganhou" numa simulação não pode continuar
+    // marcado como vencedor quando a promoção volta ao ar.
+    await db.participacaoPromocao.updateMany({
+      where: { promocaoId: dePertinho.id, vencedor: true },
+      data: { vencedor: false },
+    })
   } else {
     await db.promocao.create({ data: { emissoraId: emissora.id, ...dadosDePertinho } })
   }
