@@ -31,6 +31,11 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY package.json ./
 
+# PONTUAL — sai no próximo commit. Ver o commit anterior de mesmo nome: a primeira
+# semeadura não aplicou as cores dos quadros e a falha foi engolida em silêncio, que é
+# a razão de o `|| echo` existir agora.
+ENV SEMEAR_DEMO=1
+
 EXPOSE 3000
 
 # Aplica migrações pendentes e sobe a aplicação.
@@ -43,4 +48,4 @@ EXPOSE 3000
 # Fica desligado por padrão: numa emissora de verdade o seed não pode encostar no banco.
 # A alternativa era editar este CMD à mão toda vez que o conteúdo mudasse, que foi o que
 # eu vinha fazendo — e é assim que se esquece de desfazer.
-CMD ["sh", "-c", "npx prisma migrate deploy && { [ \"$SEMEAR_DEMO\" = \"1\" ] && node dist/scripts/seed-demo.js; :; } && node dist/server.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && { [ \"$SEMEAR_DEMO\" = \"1\" ] && { node dist/scripts/seed-demo.js || echo '!! SEED FALHOU — subindo assim mesmo'; }; :; } && node dist/server.js"]
