@@ -88,7 +88,11 @@ rotasOuvintes.patch('/perfil', exigirOuvinte(), async (req, res, next) => {
           'O CPF já está no seu cadastro e não muda por aqui. Se estiver errado, fale com a rádio.')
       }
       if (!cpfValido(dados.cpf)) {
-        throw erros.dadosInvalidos([{ campo: 'cpf', problema: 'Confira o CPF: os números não fecham.' }])
+        // Erro próprio e não `dadosInvalidos`: aquele devolve "não conseguimos entender
+        // esses dados", que num campo de CPF é inútil — a pessoa não sabe se digitou de
+        // menos, de mais ou trocou um número. Dizer que os dígitos não fecham manda ela
+        // conferir, que é o que resolve.
+        throw new ErroDaApi(422, 'cpf_invalido', 'Confira o CPF: os números não fecham.')
       }
       cpf = soDigitos(dados.cpf)
     }
