@@ -42,7 +42,13 @@ app.use((req, res, next) => {
     // caía no ramo de erro e mostrava "sem conexão" com a rede perfeita.
     res.setHeader(
       'Access-Control-Allow-Headers',
-      'Content-Type, Authorization, X-Tenant, X-App-Version, X-Platform, If-None-Match',
+      // `X-Nome-Arquivo` faltava, e por isso o envio de imagem pelo Studio **nunca
+      // chegou ao servidor**: o navegador barrava no preflight e o `fetch` falhava
+      // antes de sair. Na tela isso virou nada — a foto simplesmente não aparecia.
+      //
+      // A lição é a mesma do `If-None-Match`: cabeçalho novo no cliente é cabeçalho
+      // novo aqui, e esquecer não dá erro de compilação nem de teste. Dá silêncio.
+      'Content-Type, Authorization, X-Tenant, X-App-Version, X-Platform, If-None-Match, X-Nome-Arquivo',
     )
     // E o ETag precisa ser legível pelo JavaScript: por padrão o navegador esconde
     // tudo que não seja um punhado de cabeçalhos simples.
