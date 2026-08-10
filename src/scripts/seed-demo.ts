@@ -124,15 +124,42 @@ async function main() {
     // assim que a rádio informar quem entrou.
     { nome: 'Plantão Band FM', bio: 'A equipe que segura o fim de semana.' },
   ]
+  /**
+   * As fotos oficiais, ligadas pelo nome.
+   *
+   * Ficam aqui e não num comando avulso porque o seed é o que converge: recriar o banco
+   * antes devolvia todo mundo à silhueta, e alguém precisava lembrar de rodar o
+   * `foto-locutor` de novo, um por um. Quem não está na lista fica com o avatar de
+   * iniciais, que é honesto — é uma foto que a emissora ainda não mandou.
+   *
+   * A URL é do domínio do aplicativo, que é quem serve os arquivos estáticos.
+   */
+  const APP = process.env.APP_URL_PUBLICA ?? 'https://app.radioconnect.technowhub.ai'
+  const FOTOS: Record<string, string> = {
+    'Marcelo Café': `${APP}/locutores/marcelo-cafe.webp`,
+    'Robson Ramos': `${APP}/locutores/robson-ramos.webp`,
+    'Paulo Gomes': `${APP}/locutores/paulo-gomes.webp`,
+    'Maicon Sales': `${APP}/locutores/maicon-sales.webp`,
+    'Milena Barros': `${APP}/locutores/milena-barros.jpg`,
+  }
+
   const locutores: Record<string, string> = {}
   for (const l of locutoresBase) {
     const existente = await db.locutor.findFirst({ where: { emissoraId: emissora.id, nome: l.nome } })
     const criado = existente ?? (await db.locutor.create({ data: { emissoraId: emissora.id, ...l } }))
     // A bio pode ter mudado desde a última vez; o nome é a chave.
-    if (existente) await db.locutor.update({ where: { id: existente.id }, data: { bio: l.bio } })
+    const foto = FOTOS[l.nome]
+    if (existente) {
+      await db.locutor.update({
+        where: { id: existente.id },
+        data: { bio: l.bio, ...(foto ? { imagemUrl: foto } : {}) },
+      })
+    } else if (foto) {
+      await db.locutor.update({ where: { id: criado.id }, data: { imagemUrl: foto } })
+    }
     locutores[l.nome] = criado.id
   }
-  console.log(`  ${locutoresBase.length} locutores`)
+  console.log(`  ${locutoresBase.length} locutores · ${Object.keys(FOTOS).length} com foto`)
 
   // ── Programas e grade ──────────────────────────────────────
   //
