@@ -79,6 +79,24 @@ export type EstadoNoAr = {
     resultado: string | null
     patrocinio: Patrocinio
   } | null
+
+  /**
+   * As outras promoções no ar.
+   *
+   * O bloco principal mostra uma — a mais recente —, e por um tempo as demais
+   * simplesmente não existiam para quem ouve: publicar a segunda fazia a primeira
+   * desaparecer do aplicativo. Promoção invisível é inscrição que a rádio não recebe e
+   * patrocinador que pagou por exposição que não aconteceu.
+   *
+   * Vêm em forma curta: destaque para uma, lista para as outras. Nenhuma some.
+   */
+  outrasPromocoes: {
+    id: string
+    titulo: string
+    imagemUrl: string | null
+    sorteioEm: string | null
+  }[]
+
   proxima: { nome: string; comeca: string } | null
   ouvintes: number
   versao: number
@@ -280,6 +298,12 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
           patrocinio: patrocinioDe(promocao),
         }
       : null,
+    outrasPromocoes: outrasPromocoes.map((o) => ({
+      id: o.id,
+      titulo: o.titulo,
+      imagemUrl: o.imagemUrl,
+      sorteioEm: o.sorteioEm?.toISOString() ?? null,
+    })),
     proxima: proxima ? { nome: proxima.titulo ?? proxima.programa.nome, comeca: proxima.inicioEm.toISOString() } : null,
     ouvintes,
     versao,
