@@ -177,6 +177,23 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
     }))
 
 
+  // As demais no ar, sem a que já está em destaque. Forma curta: a lista é caminho, não
+  // vitrine — quem quiser ver a arte inteira abre a promoção.
+  const outrasPromocoes = promocao
+    ? await prisma.promocao.findMany({
+        where: {
+          publicada: true,
+          resultado: null,
+          inicioEm: { lte: agora },
+          fimEm: { gte: agora },
+          id: { not: promocao.id },
+        },
+        orderBy: { fimEm: 'asc' },
+        take: 4,
+        select: { id: true, titulo: true, imagemUrl: true, sorteioEm: true },
+      })
+    : []
+
   const proxima = await prisma.edicao.findFirst({
     where: { inicioEm: { gt: agora } },
     orderBy: { inicioEm: 'asc' },
