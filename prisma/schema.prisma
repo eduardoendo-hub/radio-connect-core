@@ -356,6 +356,24 @@ model Ouvinte {
   provedorAuth String? // "telefone" | "google" | "apple"
   idExterno    String?
 
+  /// CPF — a chave contra o mesmo ganhador cinco vezes.
+   ///
+   /// Não está aqui para entregar prêmio: está para impedir que a mesma pessoa concorra
+   /// com cinco telefones. É por isso que é único por emissora, e é por isso que vale a
+   /// fricção de pedir. Sem a unicidade, coletar CPF seria só assumir risco sem ganhar
+   /// nada.
+   ///
+   /// Guardado só com dígitos. Nunca sai inteiro para o aplicativo — nem para o dono, que
+   /// recebe mascarado; inteiro só na tela do contemplado, no Studio.
+  cpf String?
+
+  /// Para valer a regra dos 18 anos.
+   ///
+   /// O regulamento de toda promoção diz "maiores de 18" e até agora o produto não tinha
+   /// como saber — era uma frase. O CPF não carrega idade; a data de nascimento é o único
+   /// jeito de a trava existir de verdade.
+  dataNascimento DateTime? @db.Date
+
   /// Dados adicionais pedidos progressivamente, dentro da experiência.
   preferencias Json @default("{}")
 
@@ -375,6 +393,7 @@ model Ouvinte {
 
   @@unique([emissoraId, telefone])
   @@unique([emissoraId, idExterno])
+  @@unique([emissoraId, cpf])
   @@index([emissoraId, ultimoAcesso])
   @@map("ouvintes")
 }
@@ -466,6 +485,13 @@ model Promocao {
   /// artista do mês), o selo é o que se repete e o que o ouvinte reconhece. É a mesma
   /// distinção entre a foto do programa e o logotipo do quadro.
   seloUrl String?
+
+  /// No ar ou não — decisão de quem opera, independente das datas.
+   ///
+   /// Criar e publicar eram a mesma coisa, e não são. A produção monta a promoção com
+   /// calma, confere a arte, lê o regulamento, e só então coloca no ar. Despublicar tira
+   /// da tela sem encerrar: as inscrições de quem já entrou continuam valendo.
+  publicada Boolean @default(true)
 
   inicioEm DateTime
   fimEm    DateTime

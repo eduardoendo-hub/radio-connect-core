@@ -4,6 +4,7 @@ import { prisma } from '../../lib/prisma.js'
 import { erros, ErroDaApi } from '../../lib/erros.js'
 import { exigirOuvinte } from '../../middleware/sessao.js'
 import { patrocinioDe } from '../momentos/apresentacao.js'
+import { explicar, pendencias } from '../ouvintes/identidade.js'
 
 export const rotasPromocoes = Router()
 
@@ -68,6 +69,26 @@ rotasPromocoes.post('/:id/participar', exigirOuvinte(), async (req, res, next) =
 
     if (promocao.inicioEm > agora || promocao.fimEm < agora) {
       throw new ErroDaApi(410, 'promocao_encerrada', 'As inscrições para esta promoção já fecharam.')
+    }
+
+    // **Cadastro completo antes de concorrer.**
+    //
+    // Aqui é o único lugar do produto que exige isso, e é onde faz sentido: sorteio tem
+    // regulamento, maioridade e prêmio para entregar. A recusa diz o que falta — a tela
+    // abre nos dados e a pessoa volta em dez segundos. "Dados incompletos" faria ela
+    // desistir sem saber do quê.
+    const quem = await prisma.ouvinte.findFirst({
+      where: { id: s.ouvinteId },
+      select: { nome: true, email: true, cpf: true, dataNascimento: true },
+    })
+    const faltando = pendencias(quem!)
+    if (faltando.length > 0) {
+      throw new ErroDaApi(
+        faltando.includes('menor') ? 403 : 422,
+        faltando.includes('menor') ? 'menor_de_idade' : 'perfil_incompleto',
+        explicar(faltando),
+        { faltando },
+      )
     }
 
     // Elegibilidade por Índice de Conexão, quando a emissora exigir. A regra é do

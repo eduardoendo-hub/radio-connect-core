@@ -166,12 +166,12 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
   const doisAtras = new Date(agora.getTime() - 2 * 60 * 60 * 1000)
   const promocao =
     (await prisma.promocao.findFirst({
-      where: { inicioEm: { lte: agora }, fimEm: { gte: agora } },
+      where: { publicada: true, inicioEm: { lte: agora }, fimEm: { gte: agora } },
       orderBy: { inicioEm: 'desc' },
       select: CAMPOS_DA_PROMOCAO,
     })) ??
     (await prisma.promocao.findFirst({
-      where: { resultado: { not: null }, fimEm: { gte: doisAtras, lte: agora } },
+      where: { publicada: true, resultado: { not: null }, fimEm: { gte: doisAtras, lte: agora } },
       orderBy: { fimEm: 'desc' },
       select: CAMPOS_DA_PROMOCAO,
     }))

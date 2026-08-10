@@ -32,6 +32,7 @@ const criar = z.object({
   campanhaPatrocinadoraId: z.string().optional(),
   /// Elegibilidade por Índice de Conexão. Vazio = todo mundo concorre.
   scoreMinimo: z.number().int().min(0).max(100).optional(),
+  publicada: z.boolean().optional(),
 })
 
 rotasPromocoesStudio.post('/promocoes', exigirOperador(), async (req, res, next) => {
@@ -65,6 +66,7 @@ rotasPromocoesStudio.post('/promocoes', exigirOperador(), async (req, res, next)
         sorteioEm,
         campanhaPatrocinadoraId: dados.campanhaPatrocinadoraId || null,
         scoreMinimo: dados.scoreMinimo ?? null,
+        publicada: dados.publicada ?? true,
       },
     })
 
@@ -108,15 +110,20 @@ rotasPromocoesStudio.get('/promocoes', exigirOperador(), async (req, res, next) 
           fimEm: p.fimEm.toISOString(),
           sorteioEm: p.sorteioEm?.toISOString() ?? null,
           resultado: p.resultado,
+          publicada: p.publicada,
           participantes: p._count.participacoes,
           patrocinador: p.campanhaPatrocinadora?.anunciante.nome ?? null,
+          // "Preparada" vem antes de tudo: uma promoção despublicada não está no ar
+          // nem encerrada — ela ainda nem aconteceu, por decisão de quem opera.
           estado: p.resultado
             ? ('sorteada' as const)
-            : p.fimEm < agora
-              ? ('encerrada' as const)
-              : p.inicioEm > agora
-                ? ('agendada' as const)
-                : ('no_ar' as const),
+            : !p.publicada
+              ? ('preparada' as const)
+              : p.fimEm < agora
+                ? ('encerrada' as const)
+                : p.inicioEm > agora
+                  ? ('agendada' as const)
+                  : ('no_ar' as const),
         }))
         // No ar primeiro: é a que o produtor está operando agora e a que ele veio ver.
         .sort((a, b) => ordem(a.estado) - ordem(b.estado)),
@@ -166,11 +173,36 @@ rotasPromocoesStudio.patch('/promocoes/:id', exigirOperador(), async (req, res, 
         imagemUrl: dados.imagemUrl ?? undefined,
         seloUrl: dados.seloUrl ?? undefined,
         ...(sorteioEm ? { sorteioEm, fimEm: sorteioEm } : {}),
+        publicada: dados.publicada ?? undefined,
         campanhaPatrocinadoraId: dados.campanhaPatrocinadoraId ?? undefined,
       },
     })
     await recalcular(req.emissora!)
     res.json({ atualizada: true })
+  } catch (e) {
+    next(e)
+  }
+})
+
+/**
+ * Pôr no ar e tirar do ar, sem encerrar.
+ *
+ * Criar e publicar eram a mesma coisa, e não são: a produção monta a promoção com
+ * calma, confere a arte, lê o regulamento em voz alta, e só então coloca no ar.
+ *
+ * Despublicar **não encerra**. As inscrições de quem já entrou continuam valendo e o
+ * sorteio ainda vai acontecer — a promoção só sai da tela. É o que a rádio faz quando
+ * descobre um erro no texto no meio da tarde.
+ */
+rotasPromocoesStudio.post('/promocoes/:id/publicacao', exigirOperador(), async (req, res, next) => {
+  try {
+    const { publicada } = z.object({ publicada: z.boolean() }).parse(req.body)
+    const promocao = await prisma.promocao.findFirst({ where: { id: req.params.id } })
+    if (!promocao) throw erros.naoEncontrado('Promoção')
+
+    await prisma.promocao.update({ where: { id: promocao.id }, data: { publicada } })
+    await recalcular(req.emissora!)
+    res.json({ publicada })
   } catch (e) {
     next(e)
   }
@@ -295,7 +327,7 @@ rotasPromocoesStudio.delete('/promocoes/:id', exigirOperador(), async (req, res,
   }
 })
 
-const ORDEM = { no_ar: 0, agendada: 1, encerrada: 2, sorteada: 3 } as const
+const ORDEM = { no_ar: 0, preparada: 1, agendada: 2, encerrada: 3, sorteada: 4 } as const
 function ordem(estado: keyof typeof ORDEM) {
   return ORDEM[estado]
 }
