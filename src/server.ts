@@ -11,7 +11,9 @@ import { rotasMomentos } from './modules/momentos/rotas.js'
 import { rotasPromocoes } from './modules/promocoes/rotas.js'
 import { rotasOuvintes } from './modules/ouvintes/rotas.js'
 import { rotasPlataforma } from './modules/plataforma/rotas.js'
+import { rotasPlataformaEmissoras } from './modules/plataforma/emissoras.js'
 import { rotasStudioEntrada } from './modules/studio/entrada.js'
+import { rotasOperadores } from './modules/studio/operadores.js'
 import { rotasPromocoesStudio } from './modules/promocoes/studio.js'
 import { rotasQuemParticipou } from './modules/momentos/quem-participou.js'
 import { rotasStudio } from './modules/studio/rotas.js'
@@ -112,6 +114,7 @@ v1.use('/midia', rotasMidiaPublica)
 // O tenant vem no caminho de cada rota e entra num `comEmissora()` explícito lá dentro:
 // escolher a rádio é um ato visível, não um efeito colateral de cabeçalho.
 v1.use('/plataforma', rotasPlataforma)
+v1.use('/plataforma', rotasPlataformaEmissoras)
 
 // A entrada do Studio também fica acima do escopo: é ela que **descobre** a emissora,
 // pelo e-mail de quem entra. Montada aqui, atende `/studio/entrar` antes de a rota
@@ -129,6 +132,7 @@ v1.use('/', rotasOuvintes)
 v1.use('/conversa', rotasChat)
 v1.use('/anuncios', rotasAnuncios)
 // As rotas de chat da produção moram sob /studio junto com o resto da operação.
+v1.use('/studio', rotasOperadores)
 v1.use('/studio', rotasPromocoesStudio)
 v1.use('/studio', rotasQuemParticipou)
 v1.use('/studio', rotasChatStudio)

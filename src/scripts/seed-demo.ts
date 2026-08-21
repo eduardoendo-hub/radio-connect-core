@@ -82,6 +82,33 @@ async function main() {
   })
   console.log(`  emissora ${emissora.nome} (${emissora.id})`)
 
+  // ── A conta da TechNow ─────────────────────────────────────
+  //
+  // Nasce **só se** `SENHA_PLATAFORMA_INICIAL` existir no ambiente. Sem a variável,
+  // nenhuma conta é criada — e isso é de propósito: conta de administrador que atravessa
+  // todas as rádios com senha padrão é exatamente o que não pode existir num produto
+  // multi-cliente. Quem provisiona o servidor define a senha, e a troca em `/plataforma`
+  // existe desde o primeiro dia justamente porque esta senha nasce combinada por fora.
+  const senhaPlataforma = process.env.SENHA_PLATAFORMA_INICIAL
+  const emailPlataforma = process.env.EMAIL_PLATAFORMA_INICIAL ?? 'eduardo.endo@gmail.com'
+  if (senhaPlataforma) {
+    const jaTem = await db.operadorPlataforma.findFirst({ where: { email: emailPlataforma } })
+    if (!jaTem) {
+      await db.operadorPlataforma.create({
+        data: {
+          nome: 'Eduardo Endo',
+          email: emailPlataforma,
+          senhaHash: await bcrypt.hash(senhaPlataforma, 10),
+        },
+      })
+      console.log(`  operador da plataforma criado: ${emailPlataforma}`)
+    } else {
+      console.log('  operador da plataforma já existe — senha preservada')
+    }
+  } else {
+    console.log('  SENHA_PLATAFORMA_INICIAL ausente: nenhuma conta de plataforma criada')
+  }
+
   // ── Operadores do Studio ───────────────────────────────────
   const senhaHash = await bcrypt.hash('bandfm2026', 10)
   const operadores = [
