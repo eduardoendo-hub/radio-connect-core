@@ -44,7 +44,10 @@ rotasRelatorio.get('/emissoras/:emissoraId/relatorio', exigirPlataforma(), async
         },
       })
       const campanhas = await prisma.campanha.findMany({
-        select: { id: true, nome: true, formato: true, anunciante: { select: { nome: true } } },
+        select: {
+          id: true, nome: true, formato: true,
+          anunciante: { select: { id: true, nome: true } },
+        },
       })
       return { impressoes, campanhas }
     })
@@ -94,6 +97,63 @@ rotasRelatorio.get('/emissoras/:emissoraId/relatorio', exigirPlataforma(), async
 
     const linhas = [...porCampanha.values()].sort((a, b) => b.servidas - a.servidas)
 
+    // ── Por anunciante, que é como o comercial pensa ──────────
+    //
+    // Uma marca vive em vários lugares ao mesmo tempo: banner na rolagem, pré-roll no
+    // play, assinatura no programa, patrocínio de um Momento. Somar por campanha
+    // responde "quanto entregou aquele contrato"; somar por anunciante responde "quanto
+    // a Soneda apareceu neste mês" — que é a pergunta que ele faz ao telefone.
+    type PorMarca = {
+      anuncianteId: string
+      anunciante: string
+      servidas: number
+      cliques: number
+      porPosicao: Record<string, number>
+      campanhas: string[]
+    }
+    const porAnunciante = new Map<string, PorMarca>()
+
+    for (const i of impressoes) {
+      const c = i.campanhaId ? nomeDe.get(i.campanhaId) : null
+      const id = c?.anunciante.id ?? 'sem-anunciante'
+      const marca = porAnunciante.get(id) ?? {
+        anuncianteId: id,
+        anunciante: c?.anunciante.nome ?? 'Sem anunciante',
+        servidas: 0,
+        cliques: 0,
+        porPosicao: {},
+        campanhas: [],
+      }
+      marca.servidas++
+      if (i.clicado) marca.cliques++
+      marca.porPosicao[i.posicao] = (marca.porPosicao[i.posicao] ?? 0) + 1
+      if (c && !marca.campanhas.includes(c.nome)) marca.campanhas.push(c.nome)
+      porAnunciante.set(id, marca)
+    }
+
+    // ── Por posição, no total ─────────────────────────────────
+    const porPosicao: Record<string, number> = {}
+    for (const i of impressoes) porPosicao[i.posicao] = (porPosicao[i.posicao] ?? 0) + 1
+
+    // ── A curva por dia, por anunciante ───────────────────────
+    //
+    // O total esconde a pergunta que interessa: a entrega foi constante ou concentrada?
+    // Campanha que entregou tudo numa terça é campanha que não apareceu no resto da
+    // semana — e é isso que o anunciante percebe sem precisar de relatório.
+    const diasDoPeriodo: string[] = []
+    for (let d = new Date(inicio); d <= fim; d.setDate(d.getDate() + 1)) {
+      diasDoPeriodo.push(d.toISOString().slice(0, 10))
+    }
+    const curva = new Map<string, Map<string, number>>()
+    for (const i of impressoes) {
+      const c = i.campanhaId ? nomeDe.get(i.campanhaId) : null
+      const id = c?.anunciante.id ?? 'sem-anunciante'
+      const dia = i.ocorridaEm.toISOString().slice(0, 10)
+      const linha = curva.get(id) ?? new Map<string, number>()
+      linha.set(dia, (linha.get(dia) ?? 0) + 1)
+      curva.set(id, linha)
+    }
+
     res.json({
       periodo: { de: inicio.toISOString(), ate: fim.toISOString() },
       total: {
@@ -107,8 +167,21 @@ rotasRelatorio.get('/emissoras/:emissoraId/relatorio', exigirPlataforma(), async
         TECHNOW: impressoes.filter((i) => i.vendidoPor === 'TECHNOW').length,
         RADIO: impressoes.filter((i) => i.vendidoPor === 'RADIO').length,
       },
+      porPosicao,
       campanhas: linhas,
-      porDia: [...porDia.entries()].sort().map(([dia, total]) => ({ dia, total })),
+      anunciantes: [...porAnunciante.values()]
+        .sort((a, b) => b.servidas - a.servidas)
+        .map((m) => ({
+          ...m,
+          // A série vem com **todos os dias do período**, inclusive os zerados. Buraco
+          // no gráfico é o dado mais importante que existe aqui — é o dia em que a
+          // marca não apareceu.
+          porDia: diasDoPeriodo.map((dia) => ({
+            dia,
+            total: curva.get(m.anuncianteId)?.get(dia) ?? 0,
+          })),
+        })),
+      porDia: diasDoPeriodo.map((dia) => ({ dia, total: porDia.get(dia) ?? 0 })),
     })
   } catch (e) {
     next(e)
