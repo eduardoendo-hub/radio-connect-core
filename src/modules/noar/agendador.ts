@@ -1,6 +1,7 @@
 import { prismaSemEscopo, comEmissora } from '../../lib/prisma.js'
 import { recalcular } from './servico.js'
 import { env } from '../../lib/env.js'
+import { materializarTodas } from '../grade/materializar.js'
 import { log } from '../../lib/log.js'
 
 /**
@@ -83,15 +84,40 @@ async function varrer(): Promise<void> {
   }
 }
 
+/**
+ * De hora em hora, garante que existem edições para os próximos sete dias.
+ *
+ * Antes quem criava edição era o seed da demonstração, para hoje e amanhã — e
+ * funcionava por acidente, porque o contêiner reinicia com frequência. Um fim de semana
+ * sem deploy deixaria o aplicativo sem programa nenhum.
+ */
+let materializador: NodeJS.Timeout | null = null
+
+const UMA_HORA = 60 * 60 * 1000
+
 export function iniciarAgendador(): void {
   if (timer) return
   const intervalo = env.NO_AR_INTERVALO_SEGUNDOS * 1000
   timer = setInterval(() => void varrer().catch((e) => log.error({ err: e }, 'agendador')), intervalo)
   void varrer().catch((e) => log.error({ err: e }, 'primeira varredura do agendador'))
+
+  // A grade vira edição de hora em hora, e uma vez agora na subida.
+  //
+  // Uma hora é folgado de propósito: a materialização olha sete dias à frente, então
+  // nenhuma edição depende dela para existir a tempo. Rodar de minuto em minuto seria
+  // varrer o banco inteiro para não encontrar nada.
+  materializador = setInterval(
+    () => void materializarTodas().catch((e) => log.error({ err: e }, 'materializador')),
+    UMA_HORA,
+  )
+  void materializarTodas().catch((e) => log.error({ err: e }, 'primeira materialização'))
+
   log.info({ intervaloSegundos: env.NO_AR_INTERVALO_SEGUNDOS }, 'agendador do No Ar iniciado')
 }
 
 export function pararAgendador(): void {
   if (timer) clearInterval(timer)
+  if (materializador) clearInterval(materializador)
   timer = null
+  materializador = null
 }

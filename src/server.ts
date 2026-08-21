@@ -15,6 +15,7 @@ import { rotasPlataformaEmissoras } from './modules/plataforma/emissoras.js'
 import { rotasRelatorio } from './modules/plataforma/relatorio.js'
 import { rotasStudioEntrada } from './modules/studio/entrada.js'
 import { rotasOperadores } from './modules/studio/operadores.js'
+import { rotasGrade } from './modules/grade/rotas.js'
 import { rotasPromocoesStudio } from './modules/promocoes/studio.js'
 import { rotasQuemParticipou } from './modules/momentos/quem-participou.js'
 import { rotasStudio } from './modules/studio/rotas.js'
@@ -135,6 +136,7 @@ v1.use('/conversa', rotasChat)
 v1.use('/anuncios', rotasAnuncios)
 // As rotas de chat da produção moram sob /studio junto com o resto da operação.
 v1.use('/studio', rotasOperadores)
+v1.use('/studio', rotasGrade)
 v1.use('/studio', rotasPromocoesStudio)
 v1.use('/studio', rotasQuemParticipou)
 v1.use('/studio', rotasChatStudio)
