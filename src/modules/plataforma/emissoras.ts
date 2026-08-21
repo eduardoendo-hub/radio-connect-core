@@ -146,8 +146,8 @@ rotasPlataformaEmissoras.post('/emissoras', exigirPlataforma(), async (req, res,
 rotasPlataformaEmissoras.get('/emissoras/:emissoraId/operadores', exigirPlataforma(), async (req, res, next) => {
   try {
     const emissoraId = req.params.emissoraId!
-    const operadores = await comEmissora(emissoraId, () =>
-      prisma.operador.findMany({
+    const operadores = await comEmissora(emissoraId, async () =>
+      await prisma.operador.findMany({
         orderBy: { nome: 'asc' },
         select: { id: true, nome: true, email: true, papel: true, ativo: true, ultimoLogin: true },
       }),

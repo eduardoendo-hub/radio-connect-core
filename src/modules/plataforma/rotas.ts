@@ -74,8 +74,8 @@ rotasPlataforma.get('/emissoras', exigirPlataforma(), async (_req, res, next) =>
 rotasPlataforma.get('/emissoras/:emissoraId/carteira', exigirPlataforma(), async (req, res, next) => {
   try {
     const emissoraId = req.params.emissoraId!
-    const anunciantes = await comEmissora(emissoraId, () =>
-      prisma.anunciante.findMany({
+    const anunciantes = await comEmissora(emissoraId, async () =>
+      await prisma.anunciante.findMany({
         orderBy: { nome: 'asc' },
         include: {
           campanhas: {
@@ -125,8 +125,8 @@ rotasPlataforma.post('/emissoras/:emissoraId/anunciantes', exigirPlataforma(), a
       .parse(req.body)
     const emissoraId = req.params.emissoraId!
 
-    const anunciante = await comEmissora(emissoraId, () =>
-      prisma.anunciante.create({
+    const anunciante = await comEmissora(emissoraId, async () =>
+      await prisma.anunciante.create({
         data: { emissoraId, nome: dados.nome, contato: dados.contato || null },
       }),
     )
@@ -180,8 +180,8 @@ rotasPlataforma.post('/emissoras/:emissoraId/campanhas', exigirPlataforma(), asy
       throw new ErroDaApi(422, 'periodo_invalido', 'O fim da campanha precisa ser depois do início.')
     }
 
-    const nova = await comEmissora(emissoraId, () =>
-      prisma.campanha.create({
+    const nova = await comEmissora(emissoraId, async () =>
+      await prisma.campanha.create({
         data: {
           emissoraId,
           anuncianteId: d.anuncianteId,

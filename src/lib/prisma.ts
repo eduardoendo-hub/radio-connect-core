@@ -26,7 +26,17 @@ type ContextoEmissora = { emissoraId: string }
 
 const contexto = new AsyncLocalStorage<ContextoEmissora>()
 
-/** Roda `fn` com todas as consultas presas a esta emissora. */
+/**
+ * Roda `fn` com todas as consultas presas a esta emissora.
+ *
+ * **`fn` precisa executar a consulta, não só criá-la.** Promessa do Prisma é preguiçosa:
+ * `prisma.x.findMany()` monta a consulta e só dispara quando alguém dá `.then()` nela.
+ * Passar `() => prisma.x.findMany()` faz o `run` devolver uma promessa que só vai rodar
+ * depois — já fora deste contexto — e o guarda de tenant recusa, com razão.
+ *
+ * Escreva `async () => await prisma.x.findMany()`, ou um bloco com `await` dentro. O
+ * `await` é o que traz a execução para cá.
+ */
 export function comEmissora<T>(emissoraId: string, fn: () => Promise<T>): Promise<T> {
   return contexto.run({ emissoraId }, fn)
 }
