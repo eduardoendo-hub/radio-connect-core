@@ -29,6 +29,8 @@ export type EdicaoExistente = {
 export type Plano = {
   criar: { slotId: string; programaId: string; inicioEm: Date; fimEm: Date; locutorId: string | null }[]
   apagar: string[]
+  /** Edição que é daquela faixa mas perdeu o vínculo: volta a ser da grade. */
+  adotar: { edicaoId: string; slotId: string }[]
 }
 
 export function horaDe(hhmm: string, dia: Date) {
@@ -45,7 +47,7 @@ export function planejarDia(
   agora: Date,
 ): Plano {
   const doDia = slots.filter((s) => s.diaSemana === dia.getDay())
-  const plano: Plano = { criar: [], apagar: [] }
+  const plano: Plano = { criar: [], apagar: [], adotar: [] }
 
   // Edição órfã: veio de uma faixa que sumiu ou mudou de horário. Some — a menos que já
   // tenha Momento ou já tenha começado. Deixá-la encheria a grade de programa fantasma
@@ -71,13 +73,24 @@ export function planejarDia(
     // aconteceu neste sistema.
     if (fimEm <= agora) continue
 
-    const jaTem = existentes.some(
+    const jaTem = existentes.find(
       (e) =>
         e.programaId === s.programaId &&
         e.inicioEm.getTime() === inicioEm.getTime() &&
         !plano.apagar.includes(e.id),
     )
-    if (jaTem) continue
+    if (jaTem) {
+      // **Órfã que voltou para casa.** Mesmo programa, mesmo minuto, mas sem vínculo com
+      // faixa nenhuma: é esta edição, só que desligada da grade. Sem adotá-la, ela ocupa
+      // o horário para sempre — bloqueia a criação da edição certa e sobrevive a toda
+      // remoção de faixa, porque a varredura de órfãs a confunde com edição especial.
+      //
+      // Isso não é hipótese: a produção ficou com uma dessas, de quando apagar a faixa
+      // zerava o `slotId` em vez de levar a edição junto. Adotar é o que cura o passado
+      // sem precisar de migração escrita à mão.
+      if (!jaTem.slotId) plano.adotar.push({ edicaoId: jaTem.id, slotId: s.id })
+      continue
+    }
 
     plano.criar.push({
       slotId: s.id,

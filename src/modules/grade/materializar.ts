@@ -35,7 +35,7 @@ export async function materializarEdicoes(emissoraId: string, dias = DIAS_A_FREN
       where: { ativo: true, programa: { ativo: true } },
       include: { programa: { select: { id: true, locutorTitularId: true } } },
     })
-    if (slots.length === 0) return { criadas: 0, removidas: 0 }
+    if (slots.length === 0) return { criadas: 0, removidas: 0, adotadas: 0 }
 
     const daGrade: SlotDaGrade[] = slots.map((s) => ({
       id: s.id,
@@ -48,6 +48,7 @@ export async function materializarEdicoes(emissoraId: string, dias = DIAS_A_FREN
 
     let criadas = 0
     let removidas = 0
+    let adotadas = 0
 
     for (let desloc = 0; desloc < dias; desloc++) {
       const dia = new Date(agora)
@@ -78,13 +79,17 @@ export async function materializarEdicoes(emissoraId: string, dias = DIAS_A_FREN
         const r = await prisma.edicao.deleteMany({ where: { id: { in: plano.apagar } } })
         removidas += r.count
       }
+      for (const ad of plano.adotar) {
+        await prisma.edicao.update({ where: { id: ad.edicaoId }, data: { slotId: ad.slotId } })
+        adotadas++
+      }
       for (const c of plano.criar) {
         await prisma.edicao.create({ data: { emissoraId, ...c } })
         criadas++
       }
     }
 
-    return { criadas, removidas }
+    return { criadas, removidas, adotadas }
   })
 }
 

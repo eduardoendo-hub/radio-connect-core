@@ -103,3 +103,21 @@ test('edição que perdeu o slotId parece especial — por isso a rota apaga ant
   const plano = planejarDia([], [edicao({ slotId: null })], dia(SEXTA), SEXTA)
   assert.deepEqual(plano.apagar, [], 'se um dia isto apagar, a rota pode parar de apagar antes')
 })
+
+test('a órfã do mesmo programa e horário volta a ser da grade', () => {
+  const plano = planejarDia([slot()], [edicao({ slotId: null })], dia(SEXTA), SEXTA)
+  assert.deepEqual(plano.adotar, [{ edicaoId: 'e1', slotId: 's1' }])
+  assert.deepEqual(plano.criar, [], 'adotou, então não duplica')
+  assert.deepEqual(plano.apagar, [])
+})
+
+test('edição especial em horário que a grade não usa continua intocada', () => {
+  const plano = planejarDia(
+    [slot({ horaInicio: '22:00', horaFim: '23:00' })],
+    [edicao({ slotId: null })],
+    dia(SEXTA),
+    SEXTA,
+  )
+  assert.deepEqual(plano.adotar, [], 'não é da faixa: horário diferente')
+  assert.deepEqual(plano.apagar, [])
+})
