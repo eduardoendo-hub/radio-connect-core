@@ -1,30 +1,24 @@
 /**
  * O Índice de Conexão.
  *
- * **A tela Sua Rádio mostrava números inventados.** "3h20 de escuta nesta semana", "12
- * Momentos no mês", "voltou em quatro dias" — nada disso vinha do banco, e o produto
- * nunca mediu tempo de escuta. Numa tela que o ouvinte lê como sendo sobre ele, número
- * inventado é a pior coisa que se pode colocar: no dia em que a pessoa reparar que o
- * número não muda, tudo o mais na tela vira suspeito.
+ * **A metodologia é a mesma para todas as rádios; os números são de cada uma.** Uma rádio
+ * de notícia em que a pessoa entra três vezes por dia por cinco minutos e uma FM que fica
+ * ligada a manhã inteira medem o mesmo hábito com réguas diferentes — e quem sabe qual é
+ * a régua é a emissora, não nós. Por isso a estrutura vive aqui, no código, e os limiares
+ * vivem em `Emissora.configuracao`, editáveis no Studio.
  *
- * Aqui só entra o que o banco sabe de verdade. O que não dá para saber saiu da tela —
- * tempo de escuta não voltou como zero, voltou como nada, porque a rádio toca no
- * chuveiro e no carro e este aplicativo não tem como contar isso.
+ * O que **não** é configurável é o formato: cinco degraus, sem número, sem ranking, sem
+ * contagem regressiva e sem ameaça de perda. Isso é decisão de produto, não de operação.
  */
 
-/**
- * Do que a conexão é feita.
- *
- * Os quatro componentes vêm do capítulo do Índice: presença, participação,
- * relacionamento, constância. São contagens cruas — a régua que os transforma em nível
- * mora em `nivelDe`, separada de propósito, porque é a parte que vai mudar quando as
- * rádios disserem o que consideram um ouvinte presente.
- */
+/** Do que a conexão é feita — as contagens cruas, sem julgamento. */
 export type Componentes = {
   /// Dias distintos com presença nos últimos 7.
   diasNaSemana: number
   /// Dias distintos com presença nos últimos 30.
   diasNoMes: number
+  /// Minutos de rádio ouvidos **dentro do aplicativo** nos últimos 7 dias.
+  minutosNaSemana: number
   /// Momentos respondidos nos últimos 30 dias.
   momentosNoMes: number
   /// Promoções em que entrou, desde sempre.
@@ -35,39 +29,93 @@ export type Componentes = {
   diasDeCasa: number
 }
 
-export const NIVEIS = [
-  'Descobrindo',
-  'Ouvinte presente',
-  'Participante',
-  'Muito conectado',
-  'Embaixador',
-] as const
+/**
+ * A régua da emissora.
+ *
+ * Cada degrau é uma linha de condições que precisam valer **todas juntas**. Ler a régua
+ * de cima para baixo e parar no primeiro degrau que fecha é o que faz "Embaixador" exigir
+ * mais que "Participante" sem nenhuma aritmética escondida — não há pontuação, há
+ * condição. Foi assim de propósito: pontuação é impossível de explicar para o dono da
+ * rádio, e esta régua precisa caber numa tela que ele lê e entende.
+ */
+export type Degrau = {
+  /// O nome que o ouvinte lê. A linguagem pertence à emissora.
+  rotulo: string
+  diasNaSemana?: number
+  diasNoMes?: number
+  minutosNaSemana?: number
+  /// Momentos respondidos + promoções, somados.
+  participacoes?: number
+  diasDeCasa?: number
+}
 
 /**
- * Em que degrau a pessoa está.
+ * A régua de fábrica.
  *
- * **Presença sobe até "Ouvinte presente" e para.** Daí em diante é preciso ter feito
- * alguma coisa — responder, participar, falar. Quem só abre o aplicativo é um ouvinte, e
- * chamar isso de "Muito conectado" esvaziaria a palavra para quem de fato participa.
+ * Duas decisões estão embutidas nela, e as duas são discutíveis — é justamente por serem
+ * discutíveis que a rádio pode mudar:
  *
- * **Embaixador exige tempo, e exige tempo de propósito.** É o único degrau que não se
- * alcança numa semana intensa: pede constância — trinta dias de casa e presença em
- * quinze deles. Sem isso, o topo viraria prêmio de fim de semana e deixaria de
- * significar relação.
+ * **Só aparecer não passa do segundo degrau.** Do terceiro em diante é preciso ter feito
+ * alguma coisa. Chamar quem nunca participou de "Muito conectado" esvazia a palavra para
+ * quem participa.
  *
- * Ninguém cai de degrau por inatividade nesta função: ela olha janelas móveis, então a
- * conexão diminui sozinha quando a pessoa some. O que o produto nunca faz é **avisar**
- * que caiu — "sentimos sua falta", jamais "sua conexão vai cair".
+ * **O topo pede tempo.** Trinta dias de casa e presença em quinze deles. Sem isso,
+ * "Embaixador" viraria prêmio de fim de semana intenso e deixaria de significar relação.
  */
-export function nivelDe(c: Componentes): number {
-  const participou = c.momentosNoMes + c.promocoes
-  const engajada = participou >= 3 || (participou >= 1 && c.conversou)
+export const REGUA_PADRAO: Degrau[] = [
+  { rotulo: 'Descobrindo' },
+  { rotulo: 'Ouvinte presente', diasNaSemana: 2 },
+  { rotulo: 'Participante', participacoes: 1 },
+  { rotulo: 'Muito conectado', diasNaSemana: 4, participacoes: 3 },
+  { rotulo: 'Embaixador', diasNoMes: 15, diasDeCasa: 30, participacoes: 8 },
+]
 
-  if (c.diasNoMes >= 15 && c.diasDeCasa >= 30 && participou >= 8) return 4
-  if (c.diasNaSemana >= 4 && engajada) return 3
-  if (participou >= 1) return 2
-  if (c.diasNaSemana >= 2 || c.diasNoMes >= 3) return 1
+/** Em que degrau a pessoa está: o mais alto cujas condições ela cumpre. */
+export function nivelDe(c: Componentes, regua: Degrau[] = REGUA_PADRAO): number {
+  for (let i = regua.length - 1; i > 0; i--) {
+    if (cumpre(c, regua[i]!)) return i
+  }
   return 0
+}
+
+function cumpre(c: Componentes, d: Degrau) {
+  const participacoes = c.momentosNoMes + c.promocoes
+  return (
+    (d.diasNaSemana === undefined || c.diasNaSemana >= d.diasNaSemana) &&
+    (d.diasNoMes === undefined || c.diasNoMes >= d.diasNoMes) &&
+    (d.minutosNaSemana === undefined || c.minutosNaSemana >= d.minutosNaSemana) &&
+    (d.participacoes === undefined || participacoes >= d.participacoes) &&
+    (d.diasDeCasa === undefined || c.diasDeCasa >= d.diasDeCasa)
+  )
+}
+
+/**
+ * Lê a régua guardada, caindo na de fábrica quando não há uma.
+ *
+ * **Uma régua quebrada não pode derrubar a tela do ouvinte.** O que vem do banco é JSON
+ * livre, e um dia alguém vai gravar ali um número como texto. Cada campo é conferido um a
+ * um: o que não for número inteiro positivo simplesmente não conta como condição, o que
+ * degrada para uma régua mais frouxa em vez de para um erro.
+ */
+export function lerRegua(bruto: unknown): Degrau[] {
+  if (!Array.isArray(bruto) || bruto.length !== REGUA_PADRAO.length) return REGUA_PADRAO
+  const lida = bruto.map((d, i) => {
+    const o = (d ?? {}) as Record<string, unknown>
+    const rotulo = typeof o.rotulo === 'string' && o.rotulo.trim() ? o.rotulo.trim() : REGUA_PADRAO[i]!.rotulo
+    return {
+      rotulo,
+      diasNaSemana: inteiro(o.diasNaSemana),
+      diasNoMes: inteiro(o.diasNoMes),
+      minutosNaSemana: inteiro(o.minutosNaSemana),
+      participacoes: inteiro(o.participacoes),
+      diasDeCasa: inteiro(o.diasDeCasa),
+    }
+  })
+  return lida
+}
+
+function inteiro(v: unknown): number | undefined {
+  return typeof v === 'number' && Number.isInteger(v) && v > 0 ? v : undefined
 }
 
 /**
@@ -76,15 +124,16 @@ export function nivelDe(c: Componentes): number {
  * Frase só entra se for verdade sobre ela hoje. A lista sai curta de propósito: três
  * fatos são uma explicação, sete são um relatório, e ninguém lê o relatório da própria
  * vida numa tela de rádio.
- *
- * Quem acabou de chegar não recebe uma lista vazia embaixo de um título — recebe o
- * convite, que é o único recado honesto para quem ainda não fez nada.
  */
 export function porqueDe(c: Componentes): string[] {
   const fatos: string[] = []
 
   if (c.diasNaSemana >= 2) {
-    fatos.push(`voltou em ${porExtenso(c.diasNaSemana)} ${c.diasNaSemana === 1 ? 'dia' : 'dias'} desta semana`)
+    fatos.push(`voltou em ${porExtenso(c.diasNaSemana)} dias desta semana`)
+  }
+  if (c.minutosNaSemana >= 60) {
+    const horas = Math.floor(c.minutosNaSemana / 60)
+    fatos.push(`ouviu ${porExtenso(horas, 'f')} ${horas === 1 ? 'hora' : 'horas'} pelo aplicativo`)
   }
   if (c.momentosNoMes > 0) {
     fatos.push(
@@ -113,8 +162,8 @@ export function porqueDe(c: Componentes): string[] {
  * falando com você. A tela inteira do Índice recusa número frio — a régua é a mesma aqui.
  *
  * **Um e dois concordam em gênero**, e só eles: "duas promoções", não "dois promoções".
- * Do três em diante o português não flexiona, o que faz o descuido passar despercebido
- * em quase todo teste — foi assim que "dois promoções" quase foi para a tela do ouvinte.
+ * Do três em diante o português não flexiona, o que faz o descuido passar despercebido em
+ * quase todo teste — foi assim que "dois promoções" quase foi para a tela do ouvinte.
  */
 const PALAVRAS = ['zero', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove', 'dez']
 const FEMININO: Record<number, string> = { 1: 'uma', 2: 'duas' }

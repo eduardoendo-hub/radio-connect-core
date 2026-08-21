@@ -44,6 +44,7 @@ model Emissora {
   momentos      Momento[]
   templates     TemplateMomento[]
   ouvintes      Ouvinte[]
+  diasOuvinte   DiaDoOuvinte[]
   operadores    Operador[]
   promocoes     Promocao[]
   pushes        Push[]
@@ -394,6 +395,7 @@ model Ouvinte {
   respostas       RespostaMomento[]
   conversa        Conversa?
   snapshots       SnapshotConexao[]
+  dias            DiaDoOuvinte[]
   reconhecimentos Reconhecimento[]
   beneficios      BeneficioConcedido[]
   participacoes   ParticipacaoPromocao[]
@@ -404,6 +406,41 @@ model Ouvinte {
   @@unique([emissoraId, cpf])
   @@index([emissoraId, ultimoAcesso])
   @@map("ouvintes")
+}
+
+/// Um dia de uma pessoa com a rádio.
+///
+/// **A linha existe porque ela apareceu.** Presença é a existência do registro; minutos
+/// e aberturas são o que aconteceu dentro do dia. Uma linha por pessoa por dia, garantida
+/// por índice único — o aplicativo pode mandar sinal de vida o quanto quiser que o custo
+/// não cresce.
+///
+/// Guardar o dia agregado, e não cada evento, é o que faz "voltou em quatro dias desta
+/// semana" ser uma contagem de linhas em vez de uma varredura de log. Rádio tem muita
+/// gente e pouca pergunta: são sempre as mesmas quatro contas.
+model DiaDoOuvinte {
+  id         String   @id @default(cuid())
+  emissoraId String
+  emissora   Emissora @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+  ouvinteId  String
+  ouvinte    Ouvinte  @relation(fields: [ouvinteId], references: [id], onDelete: Cascade)
+
+  data DateTime @db.Date
+
+  /// Minutos com o áudio da rádio tocando **dentro do aplicativo**.
+  ///
+  /// Não é "quanto a pessoa ouviu rádio": ela ouve no carro e no chuveiro, e nada disso
+  /// passa por aqui. É o que o aplicativo pode afirmar sem inventar — e é justamente o
+  /// que interessa para medir a relação com o aplicativo.
+  minutosOuvidos Int @default(0)
+
+  /// Quantas vezes abriu o aplicativo no dia. Separa quem passa o dia com a rádio ligada
+  /// de quem volta várias vezes: são dois hábitos diferentes.
+  aberturas Int @default(1)
+
+  @@unique([ouvinteId, data])
+  @@index([emissoraId, data])
+  @@map("dias_do_ouvinte")
 }
 
 /// O Índice de Conexão é uma SÉRIE, não um campo do ouvinte.

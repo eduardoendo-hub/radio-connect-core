@@ -26,6 +26,7 @@ export const MODELOS_ESCOPADOS = new Set([
   'Mensagem',
   'Operador',
   'Evento',
+  'DiaDoOuvinte',
   'ImpressaoAnuncio',
   'Beneficio',
   'Arquivo',
