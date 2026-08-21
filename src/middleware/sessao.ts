@@ -36,6 +36,21 @@ export function exigirOuvinte() {
 }
 
 /** Exige operador do Studio, opcionalmente com um dos papéis informados. */
+/**
+ * Exige uma sessão da TechNow.
+ *
+ * Token de operador de emissora não serve aqui, e token de plataforma não serve nas
+ * rotas da emissora — são universos separados desde a assinatura. É por isso que a área
+ * comercial não é "uma tela escondida": é uma porta diferente.
+ */
+export function exigirPlataforma() {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    const s = req.sessao
+    if (!s || s.tipo !== 'plataforma') return next(erros.naoAutenticado())
+    next()
+  }
+}
+
 export function exigirOperador(...papeis: string[]) {
   return async (req: Request, _res: Response, next: NextFunction) => {
     const s = await ler(req)

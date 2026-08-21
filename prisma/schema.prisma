@@ -736,6 +736,34 @@ model Mensagem {
 // STUDIO — operadores e permissões
 // ─────────────────────────────────────────────────────────────
 
+/// Quem opera a plataforma, e não uma rádio.
+///
+/// **Não tem `emissoraId`, e é isso que o define.** O operador da emissora enxerga a
+/// rádio dele; este atravessa todas — é o time da TechNow, que cadastra anunciante e
+/// campanha para qualquer cliente.
+///
+/// Modelo separado, e não mais um papel em `Operador`, por dois motivos. O primeiro é
+/// forma: papel dentro de `Operador` continuaria preso a uma emissora, e uma pessoa da
+/// TechNow trabalha em todas. O segundo é de risco: com login separado, ninguém da
+/// rádio consegue um token de plataforma nem por engano de programação — a barreira
+/// está na porta, não num `if`.
+///
+/// Por que isso existe: o inventário digital — banner, pré-roll, patrocínio — só é
+/// entregue se a campanha estiver no banco. Concentrar o cadastro aqui é o que garante
+/// que toda mídia vendida passa pelo contrato.
+model OperadorPlataforma {
+  id        String @id @default(cuid())
+  nome      String
+  email     String @unique
+  senhaHash String
+
+  ativo       Boolean   @default(true)
+  ultimoLogin DateTime?
+  criadoEm    DateTime  @default(now())
+
+  @@map("operadores_plataforma")
+}
+
 enum PapelOperador {
   ADMIN // vê tudo, inclusive audiência ao vivo
   DIRETOR // indicadores, campanhas, usuários

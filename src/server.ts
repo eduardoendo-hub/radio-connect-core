@@ -10,6 +10,7 @@ import { rotasNoAr } from './modules/noar/rotas.js'
 import { rotasMomentos } from './modules/momentos/rotas.js'
 import { rotasPromocoes } from './modules/promocoes/rotas.js'
 import { rotasOuvintes } from './modules/ouvintes/rotas.js'
+import { rotasPlataforma } from './modules/plataforma/rotas.js'
 import { rotasPromocoesStudio } from './modules/promocoes/studio.js'
 import { rotasQuemParticipou } from './modules/momentos/quem-participou.js'
 import { rotasStudio } from './modules/studio/rotas.js'
@@ -105,6 +106,11 @@ v1.get('/', (_req, res) => res.json({ versao: 'v1', servico: 'radio-connect-core
 // Não abre brecha: o id é um cuid, não enumerável, e o conteúdo é uma foto que já
 // está publicada para os ouvintes daquela rádio.
 v1.use('/midia', rotasMidiaPublica)
+
+// A área da TechNow também fica ACIMA do escopo de emissora — ela atravessa as rádios.
+// O tenant vem no caminho de cada rota e entra num `comEmissora()` explícito lá dentro:
+// escolher a rádio é um ato visível, não um efeito colateral de cabeçalho.
+v1.use('/plataforma', rotasPlataforma)
 
 // Tudo abaixo pertence a uma emissora. O middleware resolve o tenant e prende a
 // requisição inteira ao escopo dele — nenhuma consulta consegue ver outra rádio.
