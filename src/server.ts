@@ -61,7 +61,11 @@ app.use((req, res, next) => {
     // E o ETag precisa ser legível pelo JavaScript: por padrão o navegador esconde
     // tudo que não seja um punhado de cabeçalhos simples.
     res.setHeader('Access-Control-Expose-Headers', 'ETag')
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
+    // `PUT` faltava e a régua de engajamento não salvava — mesmo silêncio de sempre:
+    // o navegador barra no preflight e o `fetch` falha antes de sair. Terceira vez que
+    // um pedaço de CORS morde este produto, e a primeira em que existe teste: ver
+    // `cors.test.ts`, que compara esta lista com os métodos que as rotas realmente usam.
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
     // Sem isso o navegador refaz o preflight a cada consulta — e o No Ar consulta a
     // cada dois segundos.
     res.setHeader('Access-Control-Max-Age', '86400')
