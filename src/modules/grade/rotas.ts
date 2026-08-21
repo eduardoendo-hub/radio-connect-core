@@ -96,11 +96,18 @@ rotasGrade.patch('/locutores/:id', exigirOperador(...OPERA_GRADE), async (req, r
 
 rotasGrade.get('/programas', exigirOperador(), async (_req, res, next) => {
   try {
+    const agora = new Date()
     const programas = await prisma.programa.findMany({
       orderBy: [{ ativo: 'desc' }, { nome: 'asc' }],
       include: {
         locutorTitular: { select: { id: true, nome: true } },
         equipe: { select: { id: true, nome: true } },
+        campanhaPatrocinadora: {
+          select: {
+            id: true, nome: true, status: true, inicioEm: true, fimEm: true,
+            anunciante: { select: { nome: true } },
+          },
+        },
         _count: { select: { slots: true } },
       },
     })
@@ -114,6 +121,22 @@ rotasGrade.get('/programas', exigirOperador(), async (_req, res, next) => {
         ativo: p.ativo,
         locutorTitular: p.locutorTitular,
         equipe: p.equipe,
+        campanhaPatrocinadoraId: p.campanhaPatrocinadoraId,
+        // **O patrocínio vencido aparece, e aparece como vencido.** Some-lo da tela
+        // faria o programa parecer sem patrocinador enquanto o vínculo continua no
+        // banco — e quem fosse vender aquele horário venderia o que já está ocupado.
+        // O aplicativo já não mostra assinatura vencida; a tela precisa mostrar por quê.
+        patrocinio: p.campanhaPatrocinadora
+          ? {
+              nome: p.campanhaPatrocinadora.anunciante.nome,
+              campanha: p.campanhaPatrocinadora.nome,
+              vigente:
+                p.campanhaPatrocinadora.status === 'ATIVA' &&
+                p.campanhaPatrocinadora.inicioEm <= agora &&
+                p.campanhaPatrocinadora.fimEm >= agora,
+              fimEm: p.campanhaPatrocinadora.fimEm,
+            }
+          : null,
         faixas: p._count.slots,
       })),
     })
@@ -131,12 +154,43 @@ const programa = z.object({
   equipeIds: z.array(z.string()).optional(),
   /// Nem todo horário pode ser vendido: político eleitoral, religioso, exclusividade.
   anunciosAtivos: z.boolean().optional(),
+  /**
+   * Quem assina o programa — "um oferecimento de X" com o logo.
+   *
+   * **Mora no programa e não na faixa**, e é por isso que existe aqui: o contrato é com
+   * "A Hora do Ronco", não com a terça-feira das 6h. Escolhido uma vez, assina todas as
+   * edições de todos os dias em que o programa vai ao ar — e continua assinando quando a
+   * rádio muda o horário na grade, que é o que acontece toda temporada.
+   */
+  campanhaPatrocinadoraId: z.string().nullable().optional(),
   ativo: z.boolean().optional(),
 })
+
+/**
+ * A campanha existe, é desta rádio e está valendo hoje.
+ *
+ * A vigência é conferida aqui **e** na hora de montar o Estado No Ar. Parece repetição e
+ * não é: aqui impede escolher um contrato vencido; lá impede que o escolhido ontem
+ * continue assinando amanhã. Sem a segunda, o patrocínio do programa duraria para sempre
+ * — e patrocínio que não expira é receita que a rádio deixa de recobrar.
+ */
+async function conferirCampanha(id: string) {
+  const agora = new Date()
+  const c = await prisma.campanha.findFirst({
+    where: { id },
+    select: { id: true, nome: true, status: true, inicioEm: true, fimEm: true },
+  })
+  if (!c) throw erros.naoEncontrado('Campanha')
+  if (c.status !== 'ATIVA' || c.inicioEm > agora || c.fimEm < agora) {
+    throw new ErroDaApi(409, 'campanha_fora_de_vigencia',
+      `A campanha "${c.nome}" não está valendo hoje. Só campanha vigente pode assinar um programa.`)
+  }
+}
 
 rotasGrade.post('/programas', exigirOperador(...OPERA_GRADE), async (req, res, next) => {
   try {
     const d = programa.parse(req.body)
+    if (d.campanhaPatrocinadoraId) await conferirCampanha(d.campanhaPatrocinadoraId)
     const novo = await prisma.programa.create({
       data: {
         emissoraId: req.emissora!.id,
@@ -145,6 +199,7 @@ rotasGrade.post('/programas', exigirOperador(...OPERA_GRADE), async (req, res, n
         corDestaque: d.corDestaque || null,
         locutorTitularId: d.locutorTitularId || null,
         anunciosAtivos: d.anunciosAtivos ?? true,
+        campanhaPatrocinadoraId: d.campanhaPatrocinadoraId || null,
         ...(d.equipeIds?.length
           ? { equipe: { connect: d.equipeIds.map((id) => ({ id })) } }
           : {}),
@@ -161,6 +216,7 @@ rotasGrade.patch('/programas/:id', exigirOperador(...OPERA_GRADE), async (req, r
     const d = programa.partial().parse(req.body)
     const existe = await prisma.programa.findFirst({ where: { id: req.params.id! } })
     if (!existe) throw erros.naoEncontrado('Programa')
+    if (d.campanhaPatrocinadoraId) await conferirCampanha(d.campanhaPatrocinadoraId)
 
     await prisma.programa.update({
       where: { id: existe.id },
@@ -170,6 +226,10 @@ rotasGrade.patch('/programas/:id', exigirOperador(...OPERA_GRADE), async (req, r
         corDestaque: d.corDestaque ?? undefined,
         locutorTitularId: d.locutorTitularId === undefined ? undefined : d.locutorTitularId,
         anunciosAtivos: d.anunciosAtivos ?? undefined,
+        // `=== undefined` e não `??`: `null` aqui quer dizer "tire o patrocinador", e o
+        // `??` achataria isso em "não mexa" — o programa ficaria assinado para sempre.
+        campanhaPatrocinadoraId:
+          d.campanhaPatrocinadoraId === undefined ? undefined : d.campanhaPatrocinadoraId,
         ativo: d.ativo ?? undefined,
         // `set` e não `connect`: a equipe é a lista inteira, não um acréscimo. Quem sai
         // do programa precisa sair de verdade.
