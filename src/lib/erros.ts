@@ -18,6 +18,19 @@ export class ErroDaApi extends Error {
   }
 }
 
+/**
+ * As entidades femininas do sistema, para a mensagem concordar.
+ *
+ * **Lista escrita à mão porque a terminação não decide.** "Programa" termina em -a e é
+ * masculino; "Fofocômetro" termina em -o e também. Qualquer regra por sufixo erraria
+ * justamente nas duas palavras mais nossas — e "Campanha não encontrado" numa tela que a
+ * rádio mostra para o anunciante é o tipo de descuido que faz o produto parecer
+ * traduzido.
+ */
+const FEMININOS = new Set([
+  'Campanha', 'Conversa', 'Edição', 'Faixa', 'Imagem', 'Promoção',
+])
+
 export const erros = {
   naoAutenticado: () =>
     new ErroDaApi(401, 'nao_autenticado', 'Sua sessão expirou. Entre novamente.'),
@@ -29,7 +42,7 @@ export const erros = {
     new ErroDaApi(404, 'emissora_nao_encontrada', 'Rádio não encontrada.'),
 
   naoEncontrado: (o = 'Conteúdo') =>
-    new ErroDaApi(404, 'nao_encontrado', `${o} não encontrado.`),
+    new ErroDaApi(404, 'nao_encontrado', `${o} não ${FEMININOS.has(o) ? 'encontrada' : 'encontrado'}.`),
 
   momentoEncerrado: () =>
     new ErroDaApi(409, 'momento_encerrado', 'Este Momento acabou de terminar.'),
