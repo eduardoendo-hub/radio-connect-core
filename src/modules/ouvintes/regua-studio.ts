@@ -25,6 +25,9 @@ const OPERA_REGUA = ['ADMIN', 'DIRETOR'] as const
 
 const degrau = z.object({
   rotulo: z.string().trim().min(2).max(30),
+  // 90 caracteres: é o que cabe em duas linhas no telefone. Acima disso a frase vira
+  // parágrafo, o cartão da conexão estica e a escada some abaixo da dobra.
+  frase: z.string().trim().max(90).nullish(),
   diasNaSemana: z.number().int().min(1).max(7).nullish(),
   diasNoMes: z.number().int().min(1).max(31).nullish(),
   minutosNaSemana: z.number().int().min(1).max(10080).nullish(),

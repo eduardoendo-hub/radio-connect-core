@@ -222,6 +222,7 @@ rotasOuvintes.get('/minha-conexao', exigirOuvinte(), async (req, res, next) => {
     res.json({
       nivel,
       degraus: regua.map((d) => d.rotulo),
+      frases: regua.map((d) => d.frase ?? null),
       porque: porqueDe(componentes),
       desde: eu?.criadoEm ?? null,
       momentosNoMes,

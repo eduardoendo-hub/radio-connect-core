@@ -57,11 +57,25 @@ test('quem é da Família Band pode viajar uma semana sem cair', () => {
   assert.equal(onde(viajou), 'Família Band')
 })
 
-test('nenhum degrau flexiona em gênero', () => {
+test('nem os nomes nem as frases flexionam em gênero', () => {
   // A audiência da Band é majoritariamente feminina. "Ouvinte conectado" deixaria metade
   // do público de fora, e é o tipo de coisa que ninguém percebe até estar na tela.
+  //
+  // A lista inclui `bem-vindo` porque essa é a armadilha mais comum em texto de
+  // boas-vindas — e porque ela já tinha escapado uma vez, na tela Sua Rádio.
+  const FLEXIONA = /\b(bem-vindo|obrigado|\w+(ado|ido|oso|eiro))\b/i
   for (const d of REGUA_DA_BAND) {
-    assert.doesNotMatch(d.rotulo, /\b\w+(ado|ido|oso|eiro|ista m)\b/i, `"${d.rotulo}" flexiona`)
+    assert.doesNotMatch(d.rotulo, FLEXIONA, `nome "${d.rotulo}" flexiona`)
+    assert.doesNotMatch(d.frase ?? '', FLEXIONA, `frase de "${d.rotulo}" flexiona`)
+  }
+})
+
+test('toda frase cabe no telefone', () => {
+  // Duas linhas no cartão da conexão. Acima disso a frase vira parágrafo, o cartão estica
+  // e a escada some abaixo da dobra — a pessoa deixa de ver para onde a coisa vai.
+  for (const d of REGUA_DA_BAND) {
+    assert.ok(d.frase, `"${d.rotulo}" ficou sem frase`)
+    assert.ok(d.frase!.length <= 62, `frase de "${d.rotulo}" tem ${d.frase!.length} caracteres`)
   }
 })
 

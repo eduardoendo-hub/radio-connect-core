@@ -22,19 +22,36 @@ import type { Degrau } from '../modules/ouvintes/conexao.js'
  * O estudo completo está em `docs/01-produto/06b-a-escada-da-band-fm.md`.
  */
 export const REGUA_DA_BAND: Degrau[] = [
-  { rotulo: 'Sintonizando' },
+  { rotulo: 'Sintonizando', frase: 'Você chegou agora. Fica à vontade: a casa é sua.' },
   // O degrau da maioria, e por isso fácil: duas aberturas na semana já são hábito, e o
   // capítulo do Índice proíbe punir quem prefere a experiência passiva.
-  { rotulo: 'Na escuta', diasNaSemana: 2 },
+  { rotulo: 'Na escuta', frase: 'A Band já virou parte do seu dia.', diasNaSemana: 2 },
   // Uma participação, e nada mais. O salto aqui é de natureza, não de volume: entre quem
   // nunca respondeu e quem respondeu uma vez há uma diferença; entre uma e duas, não há.
-  { rotulo: 'Chega junto', participacoes: 1 },
+  {
+    rotulo: 'Chega junto',
+    // A reciprocidade que o capítulo do Índice chama de essência: não basta a pessoa
+    // interagir se a rádio nunca reconhece que ela está ali.
+    frase: 'Você não só ouve: participa. E a gente escuta de volta.',
+    participacoes: 1,
+  },
   // "Time" e não "Colado": *colado* flexiona — colado, colada —, e a audiência da Band é
   // majoritariamente feminina. Foi o teste de gênero que pegou, depois de o nome já estar
   // escrito no estudo. *Time* é coletivo, não flexiona, e continua sendo um degrau antes
   // de família: primeiro se joga junto, depois se é de casa.
-  { rotulo: 'Time da Band', diasNaSemana: 4, participacoes: 4 },
+  {
+    rotulo: 'Time da Band',
+    frase: 'Você está no ar com a gente quase todo dia.',
+    diasNaSemana: 4,
+    participacoes: 4,
+  },
   // O topo não pede presença **nesta** semana de propósito: quem tem 45 dias de casa pode
   // viajar uma semana sem cair. "Um usuário antigo que retorna não deve recomeçar do zero."
-  { rotulo: 'Família Band', diasNoMes: 15, participacoes: 12, diasDeCasa: 45 },
+  {
+    rotulo: 'Família Band',
+    frase: 'Você é de casa. A Band não seria a mesma sem você.',
+    diasNoMes: 15,
+    participacoes: 12,
+    diasDeCasa: 45,
+  },
 ]

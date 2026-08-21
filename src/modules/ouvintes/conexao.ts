@@ -41,6 +41,18 @@ export type Componentes = {
 export type Degrau = {
   /// O nome que o ouvinte lê. A linguagem pertence à emissora.
   rotulo: string
+
+  /**
+   * Uma frase que diz o que este degrau significa, na voz da rádio.
+   *
+   * **O nome sozinho não explica o degrau.** "Chega junto" é bonito e não diz o que a
+   * pessoa fez para chegar ali nem o que ela é agora — e o Índice inteiro depende de a
+   * evolução parecer justa, o que exige que ela seja compreendida. A frase é onde a rádio
+   * fala com o ouvinte na primeira pessoa do plural.
+   *
+   * Curta: cabe numa linha e meia no telefone. Se não couber, ninguém lê.
+   */
+  frase?: string | null
   /// `null` e `undefined` querem dizer a mesma coisa aqui: não é condição. Os dois
   /// existem porque o JSON guardado carrega `null` e o objeto escrito à mão omite.
   diasNaSemana?: number | null
@@ -65,11 +77,22 @@ export type Degrau = {
  * "Embaixador" viraria prêmio de fim de semana intenso e deixaria de significar relação.
  */
 export const REGUA_PADRAO: Degrau[] = [
-  { rotulo: 'Descobrindo' },
-  { rotulo: 'Ouvinte presente', diasNaSemana: 2 },
-  { rotulo: 'Participante', participacoes: 1 },
-  { rotulo: 'Muito conectado', diasNaSemana: 4, participacoes: 3 },
-  { rotulo: 'Embaixador', diasNoMes: 15, diasDeCasa: 30, participacoes: 8 },
+  { rotulo: 'Descobrindo', frase: 'Você chegou agora. Fica à vontade.' },
+  { rotulo: 'Ouvinte presente', frase: 'A rádio já faz parte do seu dia.', diasNaSemana: 2 },
+  { rotulo: 'Participante', frase: 'Você não só ouve: participa.', participacoes: 1 },
+  {
+    rotulo: 'Muito conectado',
+    frase: 'Você está com a gente quase todo dia.',
+    diasNaSemana: 4,
+    participacoes: 3,
+  },
+  {
+    rotulo: 'Embaixador',
+    frase: 'Você é de casa. É bom ter você sempre por aqui.',
+    diasNoMes: 15,
+    diasDeCasa: 30,
+    participacoes: 8,
+  },
 ]
 
 /** Em que degrau a pessoa está: o mais alto cujas condições ela cumpre. */
@@ -108,6 +131,9 @@ export function lerRegua(bruto: unknown): Degrau[] {
     const rotulo = typeof o.rotulo === 'string' && o.rotulo.trim() ? o.rotulo.trim() : REGUA_PADRAO[i]!.rotulo
     return {
       rotulo,
+      // A frase é opcional: uma rádio pode preferir só o nome. Vazia vira `null` e a tela
+      // simplesmente não desenha a linha — nunca cai na frase de outra emissora.
+      frase: typeof o.frase === 'string' && o.frase.trim() ? o.frase.trim() : null,
       diasNaSemana: inteiro(o.diasNaSemana),
       diasNoMes: inteiro(o.diasNoMes),
       minutosNaSemana: inteiro(o.minutosNaSemana),
