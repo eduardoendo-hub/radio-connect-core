@@ -263,12 +263,21 @@ rotasGrade.delete('/grade/:id', exigirOperador(...OPERA_GRADE), async (req, res,
     const existe = await prisma.slotGrade.findFirst({ where: { id: req.params.id! } })
     if (!existe) throw erros.naoEncontrado('Faixa')
 
-    // As edições futuras sem Momento somem junto, na materialização. As que já têm
-    // conteúdo ficam: são história, e história não se apaga por mudança de grade.
+    // **As edições futuras têm que sair antes da faixa.** `Edicao.slotId` é opcional, e
+    // apagar o slot faz o Prisma zerá-lo (`SetNull`) em vez de levar a edição junto. A
+    // varredura de órfãs então vê `slotId` nulo e conclui que é edição especial, criada à
+    // mão — que ela nunca apaga. Resultado: o produtor tira o programa da grade e ele vai
+    // ao ar hoje à noite assim mesmo.
+    //
+    // As que já têm Momento ficam, e ficam de propósito: são história — voto contado,
+    // mensagem ligada a elas — e história não se apaga por mudança de grade.
+    const orfas = await prisma.edicao.deleteMany({
+      where: { slotId: existe.id, inicioEm: { gt: new Date() }, momentos: { none: {} } },
+    })
     await prisma.slotGrade.delete({ where: { id: existe.id } })
     const r = await materializarEdicoes(req.emissora!.id)
     await recalcular(req.emissora!)
-    res.json({ removida: true, edicoes: r })
+    res.json({ removida: true, edicoes: { ...r, removidas: r.removidas + orfas.count } })
   } catch (e) {
     next(e)
   }

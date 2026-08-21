@@ -1,5 +1,6 @@
 import { prisma, prismaSemEscopo, comEmissora } from '../../lib/prisma.js'
 import { log } from '../../lib/log.js'
+import { planejarDia, type SlotDaGrade } from './plano.js'
 
 /**
  * Transforma a grade semanal em edições concretas.
@@ -36,13 +37,21 @@ export async function materializarEdicoes(emissoraId: string, dias = DIAS_A_FREN
     })
     if (slots.length === 0) return { criadas: 0, removidas: 0 }
 
+    const daGrade: SlotDaGrade[] = slots.map((s) => ({
+      id: s.id,
+      programaId: s.programaId,
+      diaSemana: s.diaSemana,
+      horaInicio: s.horaInicio,
+      horaFim: s.horaFim,
+      locutorTitularId: s.programa.locutorTitularId,
+    }))
+
     let criadas = 0
     let removidas = 0
 
     for (let desloc = 0; desloc < dias; desloc++) {
       const dia = new Date(agora)
       dia.setDate(dia.getDate() + desloc)
-      const doDia = slots.filter((s) => s.diaSemana === dia.getDay())
 
       const inicioDoDia = new Date(dia); inicioDoDia.setHours(0, 0, 0, 0)
       const fimDoDia = new Date(dia); fimDoDia.setHours(23, 59, 59, 999)
@@ -52,63 +61,31 @@ export async function materializarEdicoes(emissoraId: string, dias = DIAS_A_FREN
         include: { _count: { select: { momentos: true } } },
       })
 
-      // Edição órfã: veio de um slot que sumiu ou mudou de horário. Some — a menos que
-      // já tenha Momento ou já tenha começado. Deixá-la encheria a grade de programa
-      // fantasma que ninguém sabe de onde veio.
-      for (const e of existentes) {
-        if (!e.slotId) continue // especial, criada à mão: não é da grade
-        if (e._count.momentos > 0) continue
-        if (e.inicioEm <= agora) continue
-        const aindaVale = doDia.some(
-          (s) =>
-            s.id === e.slotId &&
-            horaDe(s.horaInicio, dia).getTime() === e.inicioEm.getTime(),
-        )
-        if (!aindaVale) {
-          await prisma.edicao.delete({ where: { id: e.id } })
-          removidas++
-        }
+      const plano = planejarDia(
+        daGrade,
+        existentes.map((e) => ({
+          id: e.id,
+          slotId: e.slotId,
+          programaId: e.programaId,
+          inicioEm: e.inicioEm,
+          temMomento: e._count.momentos > 0,
+        })),
+        dia,
+        agora,
+      )
+
+      if (plano.apagar.length > 0) {
+        const r = await prisma.edicao.deleteMany({ where: { id: { in: plano.apagar } } })
+        removidas += r.count
       }
-
-      for (const s of doDia) {
-        const inicioEm = horaDe(s.horaInicio, dia)
-        const fimEm = horaDe(s.horaFim, dia)
-        // Faixa que atravessa a meia-noite — "23h às 2h". Sem isto o fim ficaria antes
-        // do início e a edição nasceria com duração negativa.
-        if (fimEm <= inicioEm) fimEm.setDate(fimEm.getDate() + 1)
-
-        // Rodar isto ao meio-dia não deve inventar a edição das 6h da manhã de hoje, que
-        // não aconteceu neste sistema.
-        if (fimEm <= agora) continue
-
-        const jaTem = await prisma.edicao.findFirst({
-          where: { programaId: s.programaId, inicioEm },
-        })
-        if (jaTem) continue
-
-        await prisma.edicao.create({
-          data: {
-            emissoraId,
-            programaId: s.programaId,
-            slotId: s.id,
-            inicioEm,
-            fimEm,
-            locutorId: s.programa.locutorTitularId,
-          },
-        })
+      for (const c of plano.criar) {
+        await prisma.edicao.create({ data: { emissoraId, ...c } })
         criadas++
       }
     }
 
     return { criadas, removidas }
   })
-}
-
-function horaDe(hhmm: string, dia: Date) {
-  const [h, m] = hhmm.split(':').map(Number)
-  const d = new Date(dia)
-  d.setHours(h ?? 0, m ?? 0, 0, 0)
-  return d
 }
 
 /**
