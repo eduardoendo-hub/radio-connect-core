@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { ErroDaApi } from '../../lib/erros.js'
 import { exigirOperador } from '../../middleware/sessao.js'
+import { invalidarCacheEmissora } from '../../middleware/tenant.js'
 import { lerRegua, REGUA_PADRAO } from './conexao.js'
 
 export const rotasRegua = Router()
@@ -78,6 +79,17 @@ rotasRegua.put('/regua', exigirOperador(...OPERA_REGUA), async (req, res, next) 
       where: { id: req.emissora!.id },
       data: { configuracao: { ...cfg, regua: d.regua } },
     })
+
+    // **Sem isto, salvar não fazia nada visível.** A emissora fica num cache de um
+    // minuto — resolver o tenant é a primeira coisa de toda requisição, e ir ao banco
+    // sempre seria a consulta mais frequente do sistema. O efeito era gravar certo e
+    // reler a régua antiga, o que na tela vira "o botão não funciona".
+    //
+    // O cache é do processo: com mais de uma instância, as outras se corrigem sozinhas
+    // ao fim do minuto. É a diferença entre um segundo e um minuto, não entre certo e
+    // errado.
+    invalidarCacheEmissora(req.emissora!.slug)
+
     res.json({ salva: true, regua: d.regua })
   } catch (e) {
     next(e)
