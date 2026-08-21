@@ -5,6 +5,9 @@ import { prisma } from '../../lib/prisma.js'
 import { erros, ErroDaApi } from '../../lib/erros.js'
 import { exigirOuvinte } from '../../middleware/sessao.js'
 import { cpfValido, explicar, mascarar, pendencias, soDigitos } from './identidade.js'
+import { nivelDe, porqueDe, NIVEIS, type Componentes } from './conexao.js'
+import { diasComPresenca } from './presenca.js'
+import { diaLocal } from '../../lib/tempo.js'
 
 export const rotasOuvintes = Router()
 
@@ -153,6 +156,70 @@ rotasOuvintes.delete('/perfil', exigirOuvinte(), async (req, res, next) => {
 
     await prisma.ouvinte.delete({ where: { id: quem.id } })
     res.json({ apagado: true })
+  } catch (e) {
+    next(e)
+  }
+})
+
+/**
+ * O Índice de Conexão desta pessoa.
+ *
+ * **Só o que o banco sabe.** Antes, a tela Sua Rádio trazia "3h20 de escuta nesta
+ * semana" e "12 Momentos no mês" escritos no aplicativo — o produto nunca mediu tempo de
+ * escuta e ninguém contava Momentos. Numa tela que o ouvinte lê como sendo sobre ele,
+ * número inventado é a pior coisa que se pode pôr: no dia em que a pessoa reparar que o
+ * número não muda, tudo o mais ali vira suspeito.
+ *
+ * Tempo de escuta não voltou como zero — voltou como nada. A rádio toca no chuveiro e no
+ * carro, e este aplicativo não tem como contar isso.
+ */
+rotasOuvintes.get('/minha-conexao', exigirOuvinte(), async (req, res, next) => {
+  try {
+    const { ouvinteId } = req.sessao as { ouvinteId: string }
+    const mesAtras = new Date()
+    mesAtras.setDate(mesAtras.getDate() - 30)
+
+    const [eu, diasNaSemana, diasNoMes, momentosNoMes, promocoes, conversa] = await Promise.all([
+      prisma.ouvinte.findFirst({ where: { id: ouvinteId }, select: { criadoEm: true } }),
+      diasComPresenca(ouvinteId, 7),
+      diasComPresenca(ouvinteId, 30),
+      prisma.respostaMomento.count({ where: { ouvinteId, respondidoEm: { gte: mesAtras } } }),
+      prisma.participacaoPromocao.count({ where: { ouvinteId } }),
+      prisma.conversa.findFirst({ where: { ouvinteId }, select: { id: true } }),
+    ])
+
+    const componentes: Componentes = {
+      diasNaSemana,
+      diasNoMes,
+      momentosNoMes,
+      promocoes,
+      conversou: conversa !== null,
+      diasDeCasa: eu
+        ? Math.floor((Date.now() - eu.criadoEm.getTime()) / (24 * 60 * 60 * 1000))
+        : 0,
+    }
+
+    const nivel = nivelDe(componentes)
+
+    // O snapshot do dia. O Índice é uma série, não um campo do ouvinte: "sua conexão
+    // cresceu esta semana" precisa do valor de antes. Gravando hoje enquanto a tela é
+    // aberta, a série começa a existir sem nenhum trabalho de recuperação depois.
+    await prisma.snapshotConexao
+      .upsert({
+        where: { ouvinteId_data: { ouvinteId, data: new Date(diaLocal()) } },
+        create: { ouvinteId, data: new Date(diaLocal()), score: nivel, nivel: NIVEIS[nivel]!, componentes },
+        update: { score: nivel, nivel: NIVEIS[nivel]!, componentes },
+      })
+      .catch(() => null)
+
+    res.json({
+      nivel,
+      rotulo: NIVEIS[nivel],
+      porque: porqueDe(componentes),
+      desde: eu?.criadoEm ?? null,
+      momentosNoMes,
+      promocoes,
+    })
   } catch (e) {
     next(e)
   }

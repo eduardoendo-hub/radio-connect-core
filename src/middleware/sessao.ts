@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express'
 import { verificar, type Sessao } from '../lib/token.js'
 import { erros } from '../lib/erros.js'
+import { registrarPresenca } from '../modules/ouvintes/presenca.js'
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -31,6 +32,11 @@ export function exigirOuvinte() {
     // Um token emitido para outra emissora não vale aqui. Cada app é um mundo fechado.
     if (s.emissoraId !== req.emissora?.id) return next(erros.naoAutenticado())
     req.sessao = s
+    // Apareceu hoje. Registrar aqui, e não em cada rota, é o que garante que qualquer
+    // uso do aplicativo conte como presença — inclusive a consulta do No Ar, que é a
+    // única coisa que quem só escuta chega a fazer. Não espera e não falha: presença é
+    // telemetria, e telemetria que atrapalha a tela é pior que telemetria que falta.
+    registrarPresenca(s.emissoraId, s.ouvinteId)
     next()
   }
 }
