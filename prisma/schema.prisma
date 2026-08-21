@@ -667,6 +667,18 @@ model ImpressaoAnuncio {
   ouvinteId String?
   edicaoId  String?
 
+  /// O que estava na tela quando a marca apareceu: a Edição, o Momento, a promoção.
+  ///
+  /// Existe para dizer **o que é uma impressão** em cada inventário. Banner é uma
+  /// exibição. Assinatura de programa não é: é "esta pessoa viu a marca durante esta
+  /// edição" — uma vez, e não uma a cada vez que a tela repinta. Sem essa referência, um
+  /// patrocínio de três horas viraria milhares de impressões por ouvinte e o relatório
+  /// deixaria de significar alguma coisa.
+  ///
+  /// A unicidade é do banco, num índice parcial que só vale quando há referência:
+  /// (campanha, ouvinte, posição, referência).
+  referenciaId String?
+
   visivel   Boolean @default(false)
   clicado   Boolean @default(false)
   concluido Boolean @default(false) // pré-roll ouvido até o fim

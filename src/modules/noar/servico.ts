@@ -32,7 +32,7 @@ export type EstadoNoAr = {
    * o do programa é permanente e barato por hora, o do Momento é pontual e caro por
    * minuto. Quem decide qual dos dois aparece é o app — ver a regra ali.
    */
-  patrocinioDoPrograma: { nome: string; logoUrl: string | null } | null
+  patrocinioDoPrograma: { nome: string; logoUrl: string | null; campanhaId: string | null } | null
   /// Se este horário aceita publicidade. Ver `Programa.anunciosAtivos`.
   anunciosAtivos: boolean
   termina: string | null
@@ -122,6 +122,7 @@ const CAMPOS_DA_PROMOCAO = {
   sorteioEm: true, resultado: true,
   campanhaPatrocinadora: {
     select: {
+      id: true,
       anunciante: { select: { nome: true } },
       criativos: { select: { tipo: true, url: true } },
     },
@@ -143,7 +144,7 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
           equipe: { select: { id: true, nome: true, imagemUrl: true } },
           campanhaPatrocinadora: {
             select: {
-              status: true, inicioEm: true, fimEm: true,
+              id: true, status: true, inicioEm: true, fimEm: true,
               anunciante: { select: { nome: true } },
               criativos: { select: { tipo: true, url: true } },
             },
@@ -251,6 +252,7 @@ export async function calcular(emissora: { id: string; slug: string; nome: strin
       return {
         nome: c.anunciante.nome,
         logoUrl: c.criativos.find((k) => k.tipo === 'imagem')?.url ?? null,
+        campanhaId: c.id,
       }
     })(),
     anunciosAtivos: edicao?.programa.anunciosAtivos ?? true,

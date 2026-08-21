@@ -10,12 +10,19 @@
 /** A identidade visual do quadro, quando ele tem uma. */
 export type Identidade = { cor: string; icone: string | null } | null
 
-/** Quem assina este Momento. */
-export type Patrocinio = { nome: string; logoUrl: string | null } | null
+/**
+ * Quem assina.
+ *
+ * `campanhaId` viaja junto porque é o aplicativo que registra a exposição: sem ele, a
+ * assinatura aparece na tela e ninguém sabe de quem contar. É um identificador opaco —
+ * não diz valor, nem período, nem quem vendeu.
+ */
+export type Patrocinio = { nome: string; logoUrl: string | null; campanhaId: string | null } | null
 
 type ComTemplate = { template?: { cor: string | null; icone: string | null } | null }
 type ComCampanha = {
   campanhaPatrocinadora?: {
+    id?: string
     anunciante: { nome: string }
     criativos?: { tipo: string; url: string }[]
   } | null
@@ -50,12 +57,18 @@ export function patrocinioDe(m: ComCampanha): Patrocinio {
   const campanha = m.campanhaPatrocinadora
   if (campanha) {
     const logo = campanha.criativos?.find((c) => c.tipo === 'imagem')
-    return { nome: campanha.anunciante.nome, logoUrl: logo?.url ?? null }
+    return {
+      nome: campanha.anunciante.nome,
+      logoUrl: logo?.url ?? null,
+      campanhaId: campanha.id ?? null,
+    }
   }
 
   const antigo = (m.config as { patrocinador?: { nome?: string; logoUrl?: string } } | null)
     ?.patrocinador
-  if (antigo?.nome) return { nome: antigo.nome, logoUrl: antigo.logoUrl ?? null }
+  // Patrocínio antigo, escrito à mão no `config`: aparece na tela e não conta impressão,
+  // porque não há campanha atrás dele. É o preço de ter começado com texto solto.
+  if (antigo?.nome) return { nome: antigo.nome, logoUrl: antigo.logoUrl ?? null, campanhaId: null }
 
   return null
 }
@@ -65,6 +78,7 @@ export const incluirApresentacao = {
   template: { select: { cor: true, icone: true } },
   campanhaPatrocinadora: {
     select: {
+      id: true,
       anunciante: { select: { nome: true } },
       criativos: { select: { tipo: true, url: true } },
     },

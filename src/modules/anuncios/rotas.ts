@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma.js'
 import { exigirOuvinte } from '../../middleware/sessao.js'
 
@@ -138,6 +139,68 @@ rotasAnuncios.get('/', exigirOuvinte(), async (req, res, next) => {
         duracao: criativo.duracao,
       },
     })
+  } catch (e) {
+    next(e)
+  }
+})
+
+/**
+ * A assinatura apareceu na tela.
+ *
+ * Banner e pré-roll já contavam porque passam por aqui para *pedir* o anúncio.
+ * Patrocínio de programa, de Momento e de promoção não passava por lugar nenhum: a marca
+ * era desenhada direto do Estado No Ar e ninguém registrava nada — o inventário mais
+ * caro do produto aparecia zerado na prestação de contas.
+ *
+ * **Uma impressão por referência, e não por repintura.** A referência é o que estava na
+ * tela: a Edição do programa, o Momento, a promoção. Um patrocínio de três horas vale
+ * uma impressão por ouvinte naquela edição, não uma a cada vez que a tela redesenha —
+ * senão o número deixa de significar alguma coisa e a fatura deixa de ser defensável.
+ *
+ * A unicidade é do banco, num índice parcial. Repetir não é erro para quem está olhando
+ * a tela: é o mesmo estado que ela já tinha.
+ */
+rotasAnuncios.post('/assinatura', exigirOuvinte(), async (req, res, next) => {
+  try {
+    const d = z
+      .object({
+        campanhaId: z.string(),
+        posicao: z.enum(['assinatura_programa', 'assinatura_momento', 'assinatura_promocao']),
+        referenciaId: z.string(),
+      })
+      .parse(req.body)
+    const s = req.sessao as { ouvinteId: string }
+
+    const campanha = await prisma.campanha.findFirst({
+      where: { id: d.campanhaId },
+      select: { id: true, vendidoPor: true },
+    })
+    // Campanha que não existe nesta emissora não conta nada. O escopo do Prisma já
+    // impede ver a de outra rádio; aqui só se evita criar impressão órfã.
+    if (!campanha) return res.json({ registrada: false })
+
+    try {
+      await prisma.impressaoAnuncio.create({
+        data: {
+          emissoraId: req.emissora!.id,
+          posicao: d.posicao,
+          origem: 'DIRETA',
+          vendidoPor: campanha.vendidoPor,
+          campanhaId: campanha.id,
+          ouvinteId: s.ouvinteId,
+          referenciaId: d.referenciaId,
+          // A assinatura é desenhada junto com o conteúdo: se o aplicativo chamou, ela
+          // está na tela. Não há segundo passo de confirmação como no banner.
+          visivel: true,
+        },
+      })
+      res.status(201).json({ registrada: true })
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        return res.json({ registrada: false, motivo: 'ja_contada' })
+      }
+      throw e
+    }
   } catch (e) {
     next(e)
   }

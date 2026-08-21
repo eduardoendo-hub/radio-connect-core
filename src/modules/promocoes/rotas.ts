@@ -19,6 +19,7 @@ export const rotasPromocoes = Router()
 const incluirPatrocinio = {
   campanhaPatrocinadora: {
     select: {
+      id: true,
       anunciante: { select: { nome: true } },
       criativos: { select: { tipo: true, url: true } },
     },
