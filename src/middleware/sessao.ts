@@ -42,11 +42,17 @@ export function exigirOuvinte() {
  * Token de operador de emissora não serve aqui, e token de plataforma não serve nas
  * rotas da emissora — são universos separados desde a assinatura. É por isso que a área
  * comercial não é "uma tela escondida": é uma porta diferente.
+ *
+ * Lê o token aqui dentro, como os outros dois guardas. A primeira versão consultava
+ * `req.sessao` — que só existe depois que outro guarda o preenche, e nenhum roda antes
+ * destas rotas. O efeito era toda a área da TechNow respondendo 401, com o login
+ * funcionando (não tem guarda) e nada mais.
  */
 export function exigirPlataforma() {
-  return (req: Request, _res: Response, next: NextFunction) => {
-    const s = req.sessao
+  return async (req: Request, _res: Response, next: NextFunction) => {
+    const s = await ler(req)
     if (!s || s.tipo !== 'plataforma') return next(erros.naoAutenticado())
+    req.sessao = s
     next()
   }
 }

@@ -11,6 +11,7 @@ import { rotasMomentos } from './modules/momentos/rotas.js'
 import { rotasPromocoes } from './modules/promocoes/rotas.js'
 import { rotasOuvintes } from './modules/ouvintes/rotas.js'
 import { rotasPlataforma } from './modules/plataforma/rotas.js'
+import { rotasStudioEntrada } from './modules/studio/entrada.js'
 import { rotasPromocoesStudio } from './modules/promocoes/studio.js'
 import { rotasQuemParticipou } from './modules/momentos/quem-participou.js'
 import { rotasStudio } from './modules/studio/rotas.js'
@@ -111,6 +112,11 @@ v1.use('/midia', rotasMidiaPublica)
 // O tenant vem no caminho de cada rota e entra num `comEmissora()` explícito lá dentro:
 // escolher a rádio é um ato visível, não um efeito colateral de cabeçalho.
 v1.use('/plataforma', rotasPlataforma)
+
+// A entrada do Studio também fica acima do escopo: é ela que **descobre** a emissora,
+// pelo e-mail de quem entra. Montada aqui, atende `/studio/entrar` antes de a rota
+// escopada existir — e por isso a versão de lá foi removida, para não haver duas.
+v1.use('/studio', rotasStudioEntrada)
 
 // Tudo abaixo pertence a uma emissora. O middleware resolve o tenant e prende a
 // requisição inteira ao escopo dele — nenhuma consulta consegue ver outra rádio.
