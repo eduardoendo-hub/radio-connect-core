@@ -12,6 +12,7 @@ import { rotasPromocoes } from './modules/promocoes/rotas.js'
 import { rotasOuvintes } from './modules/ouvintes/rotas.js'
 import { rotasPlataforma } from './modules/plataforma/rotas.js'
 import { rotasPlataformaEmissoras } from './modules/plataforma/emissoras.js'
+import { rotasRelatorio } from './modules/plataforma/relatorio.js'
 import { rotasStudioEntrada } from './modules/studio/entrada.js'
 import { rotasOperadores } from './modules/studio/operadores.js'
 import { rotasPromocoesStudio } from './modules/promocoes/studio.js'
@@ -115,6 +116,7 @@ v1.use('/midia', rotasMidiaPublica)
 // escolher a rádio é um ato visível, não um efeito colateral de cabeçalho.
 v1.use('/plataforma', rotasPlataforma)
 v1.use('/plataforma', rotasPlataformaEmissoras)
+v1.use('/plataforma', rotasRelatorio)
 
 // A entrada do Studio também fica acima do escopo: é ela que **descobre** a emissora,
 // pelo e-mail de quem entra. Montada aqui, atende `/studio/entrar` antes de a rota
