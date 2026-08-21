@@ -313,6 +313,14 @@ model TemplateMomento {
   duracaoSegundos Int     @default(180)
   favorito        Boolean @default(false)
 
+  /// Fora da vitrine, sem sair da história.
+  ///
+  /// Rádio troca de formato por temporada — o quadro do verão volta em dezembro, o que
+  /// não pegou some em março. Apagar não serve: `Momento.templateId` é opcional, e o
+  /// Prisma zeraria o vínculo de tudo que já foi ao ar, tirando a cor e o ícone do
+  /// quadro de toda a história dele.
+  arquivado Boolean @default(false)
+
   /// A identidade visual do quadro — cor e ícone que o ouvinte aprende a reconhecer.
   ///
   /// Mora aqui, e não no `TipoMomento`, porque identidade é do **quadro** e não da

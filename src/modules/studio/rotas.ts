@@ -92,7 +92,12 @@ rotasStudio.get('/edicoes/:id', exigirOperador(), async (req, res, next) => {
 
 rotasStudio.get('/templates', exigirOperador(), async (req, res, next) => {
   try {
-    const templates = await prisma.templateMomento.findMany({ orderBy: [{ favorito: 'desc' }, { nome: 'asc' }] })
+    // O arquivado fica de fora: é exatamente para isto que arquivar serve — tirar o
+    // quadro da vitrine do Ao Vivo sem apagar o que ele já colocou no ar.
+    const templates = await prisma.templateMomento.findMany({
+      where: { arquivado: false },
+      orderBy: [{ favorito: 'desc' }, { nome: 'asc' }],
+    })
     res.json({ templates })
   } catch (e) {
     next(e)

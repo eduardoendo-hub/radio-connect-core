@@ -64,8 +64,10 @@ rotasGrade.patch('/locutores/:id', exigirOperador(...OPERA_GRADE), async (req, r
     const d = z
       .object({
         nome: z.string().trim().min(2).max(80).optional(),
-        bio: z.string().trim().max(200).optional(),
-        imagemUrl: z.string().trim().max(500).optional(),
+        bio: z.string().trim().max(200).nullable().optional(),
+        // `nullable` e não só `optional`: sem isso dá para trocar a foto do locutor e
+        // nunca tirar a que está lá — a pessoa saiu da rádio e o rosto fica.
+        imagemUrl: z.string().trim().max(500).nullable().optional(),
         ativo: z.boolean().optional(),
       })
       .parse(req.body)
@@ -74,10 +76,13 @@ rotasGrade.patch('/locutores/:id', exigirOperador(...OPERA_GRADE), async (req, r
 
     await prisma.locutor.update({
       where: { id: existe.id },
+      // **`?? undefined` não serve aqui.** Ele achata `null` em `undefined`, e o Prisma
+      // lê `undefined` como "não mexe neste campo" — então limpar a foto ou a bio era
+      // silenciosamente ignorado. `undefined` só quando o campo não veio no corpo.
       data: {
         nome: d.nome ?? undefined,
-        bio: d.bio ?? undefined,
-        imagemUrl: d.imagemUrl ?? undefined,
+        bio: d.bio === undefined ? undefined : d.bio,
+        imagemUrl: d.imagemUrl === undefined ? undefined : d.imagemUrl,
         ativo: d.ativo ?? undefined,
       },
     })
