@@ -41,12 +41,14 @@ export type Componentes = {
 export type Degrau = {
   /// O nome que o ouvinte lê. A linguagem pertence à emissora.
   rotulo: string
-  diasNaSemana?: number
-  diasNoMes?: number
-  minutosNaSemana?: number
+  /// `null` e `undefined` querem dizer a mesma coisa aqui: não é condição. Os dois
+  /// existem porque o JSON guardado carrega `null` e o objeto escrito à mão omite.
+  diasNaSemana?: number | null
+  diasNoMes?: number | null
+  minutosNaSemana?: number | null
   /// Momentos respondidos + promoções, somados.
-  participacoes?: number
-  diasDeCasa?: number
+  participacoes?: number | null
+  diasDeCasa?: number | null
 }
 
 /**
@@ -80,12 +82,14 @@ export function nivelDe(c: Componentes, regua: Degrau[] = REGUA_PADRAO): number 
 
 function cumpre(c: Componentes, d: Degrau) {
   const participacoes = c.momentosNoMes + c.promocoes
+  // `?? 0` cobre `null` e `undefined` de uma vez: os dois querem dizer "não é condição",
+  // e qualquer contagem é `>= 0`.
   return (
-    (d.diasNaSemana === undefined || c.diasNaSemana >= d.diasNaSemana) &&
-    (d.diasNoMes === undefined || c.diasNoMes >= d.diasNoMes) &&
-    (d.minutosNaSemana === undefined || c.minutosNaSemana >= d.minutosNaSemana) &&
-    (d.participacoes === undefined || participacoes >= d.participacoes) &&
-    (d.diasDeCasa === undefined || c.diasDeCasa >= d.diasDeCasa)
+    c.diasNaSemana >= (d.diasNaSemana ?? 0) &&
+    c.diasNoMes >= (d.diasNoMes ?? 0) &&
+    c.minutosNaSemana >= (d.minutosNaSemana ?? 0) &&
+    participacoes >= (d.participacoes ?? 0) &&
+    c.diasDeCasa >= (d.diasDeCasa ?? 0)
   )
 }
 
@@ -116,6 +120,50 @@ export function lerRegua(bruto: unknown): Degrau[] {
 
 function inteiro(v: unknown): number | undefined {
   return typeof v === 'number' && Number.isInteger(v) && v > 0 ? v : undefined
+}
+
+/**
+ * O que torna uma régua inutilizável sem dar erro.
+ *
+ * As duas configurações abaixo não quebram nada: elas simplesmente produzem uma escada em
+ * que ninguém sobe, e o dono da rádio passa semanas achando que o aplicativo não engaja.
+ * Recusar na hora é mais barato que explicar depois.
+ *
+ * Mora aqui, e não na rota, porque o seed também escreve régua — direto no banco, sem
+ * passar por rota nenhuma. A régua de fábrica de cada emissora nova precisa passar pelo
+ * mesmo crivo que a régua editada à mão, senão a rádio nasce com uma escada que o próprio
+ * Studio recusaria salvar.
+ */
+export function conferirRegua(regua: Degrau[]): string | null {
+  if (regua.length !== REGUA_PADRAO.length) {
+    return `A escada tem ${REGUA_PADRAO.length} degraus, não ${regua.length}.`
+  }
+
+  const primeiro = regua[0]!
+  if (CONDICOES.some((c) => primeiro[c])) {
+    return `"${primeiro.rotulo}" é onde a pessoa começa. Ele não pode exigir nada — só o nome muda.`
+  }
+
+  for (let i = 2; i < regua.length; i++) {
+    const antes = regua[i - 1]!
+    const agora = regua[i]!
+    const frouxo = CONDICOES.find((c) => (agora[c] ?? 0) > 0 && (antes[c] ?? 0) > (agora[c] ?? 0))
+    if (frouxo) {
+      return `"${agora.rotulo}" pede menos que "${antes.rotulo}" em ${NOMES[frouxo]}. ` +
+        'Cada degrau precisa ser mais difícil que o de baixo, senão ninguém sobe.'
+    }
+  }
+  return null
+}
+
+const CONDICOES = ['diasNaSemana', 'diasNoMes', 'minutosNaSemana', 'participacoes', 'diasDeCasa'] as const
+
+const NOMES: Record<(typeof CONDICOES)[number], string> = {
+  diasNaSemana: 'dias na semana',
+  diasNoMes: 'dias no mês',
+  minutosNaSemana: 'minutos ouvidos',
+  participacoes: 'participações',
+  diasDeCasa: 'tempo de casa',
 }
 
 /**

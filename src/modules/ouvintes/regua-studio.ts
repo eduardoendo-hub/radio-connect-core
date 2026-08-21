@@ -4,7 +4,7 @@ import { prisma } from '../../lib/prisma.js'
 import { ErroDaApi } from '../../lib/erros.js'
 import { exigirOperador } from '../../middleware/sessao.js'
 import { invalidarCacheEmissora } from '../../middleware/tenant.js'
-import { lerRegua, REGUA_PADRAO } from './conexao.js'
+import { lerRegua, conferirRegua, REGUA_PADRAO } from './conexao.js'
 
 export const rotasRegua = Router()
 
@@ -49,30 +49,11 @@ rotasRegua.put('/regua', exigirOperador(...OPERA_REGUA), async (req, res, next) 
   try {
     const d = z.object({ regua: z.array(degrau).length(5) }).parse(req.body)
 
-    // **Cada degrau precisa ser mais difícil que o anterior.** Uma régua em que
-    // "Participante" pede mais que "Muito conectado" não erra: ela simplesmente nunca
-    // promove ninguém ao degrau de cima, e o dono da rádio passa semanas achando que o
-    // aplicativo não engaja. Recusar aqui é mais barato que explicar isso depois.
-    for (let i = 2; i < d.regua.length; i++) {
-      const antes = d.regua[i - 1]!
-      const agora = d.regua[i]!
-      const frouxo = (['diasNaSemana', 'diasNoMes', 'minutosNaSemana', 'participacoes', 'diasDeCasa'] as const)
-        .find((c) => (agora[c] ?? 0) > 0 && (antes[c] ?? 0) > (agora[c] ?? 0))
-      if (frouxo) {
-        throw new ErroDaApi(400, 'regua_invertida',
-          `"${agora.rotulo}" pede menos que "${antes.rotulo}" em ${NOMES[frouxo]}. ` +
-          'Cada degrau precisa ser mais difícil que o de baixo, senão ninguém sobe.')
-      }
-    }
-
-    // O primeiro degrau é onde todo mundo começa: exigir qualquer coisa dele deixaria
-    // gente do lado de fora da própria escada.
-    const primeiro = d.regua[0]!
-    if (primeiro.diasNaSemana || primeiro.diasNoMes || primeiro.minutosNaSemana ||
-        primeiro.participacoes || primeiro.diasDeCasa) {
-      throw new ErroDaApi(400, 'primeiro_degrau_com_exigencia',
-        `"${primeiro.rotulo}" é onde a pessoa começa. Ele não pode exigir nada — só o nome muda.`)
-    }
+    // A mesma conferência que a régua de fábrica de qualquer emissora precisa passar.
+    // Régua torta não quebra nada — só produz uma escada em que ninguém sobe, e o dono
+    // da rádio passa semanas achando que o aplicativo não engaja.
+    const problema = conferirRegua(d.regua)
+    if (problema) throw new ErroDaApi(400, 'regua_invalida', problema)
 
     const cfg = (req.emissora!.configuracao ?? {}) as Record<string, unknown>
     await prisma.emissora.update({
@@ -95,11 +76,3 @@ rotasRegua.put('/regua', exigirOperador(...OPERA_REGUA), async (req, res, next) 
     next(e)
   }
 })
-
-const NOMES: Record<string, string> = {
-  diasNaSemana: 'dias na semana',
-  diasNoMes: 'dias no mês',
-  minutosNaSemana: 'minutos ouvidos',
-  participacoes: 'participações',
-  diasDeCasa: 'tempo de casa',
-}

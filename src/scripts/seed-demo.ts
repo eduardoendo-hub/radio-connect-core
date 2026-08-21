@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { prismaSemEscopo as db } from '../lib/prisma.js'
+import { REGUA_DA_BAND } from './regua-band.js'
 
 /**
  * A rádio da demonstração.
@@ -72,6 +73,7 @@ async function main() {
           maxImpressoesPorSessao: 6,
         },
         momento: { duracaoPadraoSegundos: 180 },
+        regua: REGUA_DA_BAND,
       },
       conteudo: {
         saudacaoManha: 'Bom dia!',
@@ -81,6 +83,23 @@ async function main() {
     },
   })
   console.log(`  emissora ${emissora.nome} (${emissora.id})`)
+
+  // A escada, para a emissora que já existia.
+  //
+  // O `upsert` acima só escreve configuração quando **cria** a rádio, e a Band foi criada
+  // antes de a escada existir. Isto preenche o que falta — e só o que falta: se a régua já
+  // está lá, não se toca. O seed roda a cada reinício do contêiner, e uma rádio que
+  // renomeou os degraus no Studio perderia o trabalho toda vez que a máquina subisse.
+  {
+    const cfg = (emissora.configuracao ?? {}) as Record<string, unknown>
+    if (!Array.isArray(cfg.regua)) {
+      await db.emissora.update({
+        where: { id: emissora.id },
+        data: { configuracao: { ...cfg, regua: REGUA_DA_BAND } },
+      })
+      console.log('  escada de conexão da Band FM carregada')
+    }
+  }
 
   // ── A conta da TechNow ─────────────────────────────────────
   //
