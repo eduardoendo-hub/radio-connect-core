@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { erros } from '../../lib/erros.js'
 import { exigirOuvinte, exigirOperador } from '../../middleware/sessao.js'
+import { anotar } from '../audiencia/registro.js'
 
 /**
  * Chat — conversa privada entre o ouvinte e a rádio.
@@ -66,6 +67,10 @@ rotasChat.post('/mensagens', exigirOuvinte(), async (req, res, next) => {
       where: { inicioEm: { lte: agora }, fimEm: { gte: agora } },
       select: { id: true },
     })
+
+    // Só a mensagem que **chega**. A resposta da produção é trabalho da rádio, não
+    // audiência — somar as duas faria o painel subir quanto mais a rádio respondesse.
+    anotar(req.emissora!.id, { contadores: { mensagens: 1 } })
 
     const mensagem = await prisma.mensagem.create({
       data: {

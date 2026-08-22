@@ -8,6 +8,7 @@ import { exigirOuvinte } from '../../middleware/sessao.js'
 import { recalcular } from '../noar/servico.js'
 import { jaRevelou, paraOOuvinte, type ConfigFofocometro } from './fofocometro.js'
 import { identidadeDe, patrocinioDe, incluirApresentacao } from './apresentacao.js'
+import { anotar } from '../audiencia/registro.js'
 
 export const rotasMomentos = Router()
 
@@ -70,6 +71,10 @@ rotasMomentos.post('/:id/responder', exigirOuvinte(), async (req, res, next) => 
       }
       throw e
     }
+
+    // O voto entrou. Conta como evento — cinco votos de uma pessoa são cinco votos, e é
+    // o número de votos que diz se o quadro pegou.
+    anotar(req.emissora!.id, { contadores: { momentos: 1 } })
 
     const opcoes = await prisma.opcaoMomento.findMany({
       where: { momentoId: momento.id },

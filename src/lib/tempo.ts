@@ -21,3 +21,21 @@ export function diaLocal(quando = new Date(), fuso = 'America/Sao_Paulo') {
     day: '2-digit',
   }).format(quando)
 }
+
+/**
+ * O começo da faixa de trinta minutos a que este instante pertence — sempre :00 ou :30.
+ *
+ * **Toda a tela de Audiência depende disto.** Duas requisições no mesmo minuto precisam
+ * cair na mesma linha, senão a contagem de pessoas distintas deixa de significar alguma
+ * coisa: cada uma teria seu próprio conjunto no Redis e a mesma pessoa contaria várias
+ * vezes. Zerar segundos e milissegundos não é detalhe — `new Date()` os carrega, e sem
+ * isso duas chamadas no mesmo segundo nunca dariam o mesmo instante.
+ *
+ * Vive aqui, junto de `diaLocal`, pela mesma razão: função pura roda no teste sem banco e
+ * sem variável de ambiente.
+ */
+export function faixaDe(quando = new Date()) {
+  const d = new Date(quando)
+  d.setMinutes(d.getMinutes() < 30 ? 0 : 30, 0, 0)
+  return d
+}

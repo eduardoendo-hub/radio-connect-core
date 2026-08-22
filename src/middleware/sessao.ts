@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express'
 import { verificar, type Sessao } from '../lib/token.js'
 import { erros } from '../lib/erros.js'
 import { registrarPresenca } from '../modules/ouvintes/presenca.js'
+import { anotar } from '../modules/audiencia/registro.js'
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -37,6 +38,11 @@ export function exigirOuvinte() {
     // única coisa que quem só escuta chega a fazer. Não espera e não falha: presença é
     // telemetria, e telemetria que atrapalha a tela é pior que telemetria que falta.
     registrarPresenca(s.emissoraId, s.ouvinteId)
+    // **"No aplicativo" conta aqui, e não no sinal de vida.** Quem abre para votar num
+    // Momento com a rádio tocando no carro nunca manda sinal de áudio — e é gente que
+    // está dentro do produto, participando. Contar só quem faz streaming esconderia
+    // justamente a parte da base que não quer gastar os dados dela com o nosso stream.
+    anotar(s.emissoraId, { ouvinteId: s.ouvinteId })
     next()
   }
 }

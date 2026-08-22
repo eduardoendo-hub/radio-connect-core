@@ -7,6 +7,7 @@ import { exigirOuvinte } from '../../middleware/sessao.js'
 import { cpfValido, explicar, mascarar, pendencias, soDigitos } from './identidade.js'
 import { nivelDe, porqueDe, lerRegua, type Componentes } from './conexao.js'
 import { diaLocal } from '../../lib/tempo.js'
+import { anotar } from '../audiencia/registro.js'
 
 export const rotasOuvintes = Router()
 
@@ -252,6 +253,15 @@ rotasOuvintes.post('/sinal-de-vida', exigirOuvinte(), async (req, res, next) => 
     const d = z.object({
       minutos: z.number().int().min(0).max(5).default(0),
       abriu: z.boolean().default(false),
+      /// Se o áudio da rádio está tocando pelo aplicativo **neste instante**.
+      ///
+      /// Vem separado dos minutos porque são perguntas diferentes: minutos é quanto
+      /// tocou desde o último sinal, `ouvindo` é o estado agora. A tela de Audiência
+      /// precisa do estado para dizer quantas pessoas estão com o som na orelha neste
+      /// minuto, e nenhum somatório de minutos responde isso.
+      ouvindo: z.boolean().default(false),
+      /// Apertou o play agora. Evento, não estado — por isso conta separado.
+      play: z.boolean().default(false),
     }).parse(req.body ?? {})
 
     const hoje = new Date(diaLocal())
@@ -269,6 +279,15 @@ rotasOuvintes.post('/sinal-de-vida', exigirOuvinte(), async (req, res, next) => 
         ...(d.abriu ? { aberturas: { increment: 1 } } : {}),
       },
     })
+    anotar(req.emissora!.id, {
+      ouvinteId,
+      ouvindo: d.ouvindo,
+      contadores: {
+        minutosOuvidos: d.minutos,
+        plays: d.play ? 1 : 0,
+      },
+    })
+
     res.json({ registrado: true })
   } catch (e) {
     next(e)

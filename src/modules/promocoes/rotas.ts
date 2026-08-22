@@ -5,6 +5,7 @@ import { erros, ErroDaApi } from '../../lib/erros.js'
 import { exigirOuvinte } from '../../middleware/sessao.js'
 import { patrocinioDe } from '../momentos/apresentacao.js'
 import { explicar, pendencias } from '../ouvintes/identidade.js'
+import { anotar } from '../audiencia/registro.js'
 
 export const rotasPromocoes = Router()
 
@@ -114,6 +115,10 @@ rotasPromocoes.post('/:id/participar', exigirOuvinte(), async (req, res, next) =
       await prisma.participacaoPromocao.create({
         data: { promocaoId: promocao.id, ouvinteId: s.ouvinteId },
       })
+      // **Depois do `create`, e não antes.** O toque repetido na rede ruim é recusado
+      // pelo índice único logo abaixo; anotar antes contaria como participação a segunda
+      // tentativa da mesma pessoa, e o painel mediria ansiedade em vez de audiência.
+      anotar(req.emissora!.id, { contadores: { participacoes: 1 } })
     } catch (e) {
       // Unicidade por par (promoção, ouvinte) mora no banco. Tocar duas vezes no botão
       // com a rede ruim não pode virar duas chances de ganhar.

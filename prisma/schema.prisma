@@ -45,6 +45,7 @@ model Emissora {
   templates     TemplateMomento[]
   ouvintes      Ouvinte[]
   diasOuvinte   DiaDoOuvinte[]
+  faixasAudiencia FaixaAudiencia[]
   operadores    Operador[]
   promocoes     Promocao[]
   pushes        Push[]
@@ -406,6 +407,74 @@ model Ouvinte {
   @@unique([emissoraId, cpf])
   @@index([emissoraId, ultimoAcesso])
   @@map("ouvintes")
+}
+
+/// Meia hora de audiência.
+///
+/// **É o fato de onde saem as três telas de Audiência.** Uma linha por faixa de trinta
+/// minutos, com os contadores do que aconteceu ali. São 48 linhas por dia por rádio —
+/// dezessete mil por ano, o que cabe em qualquer lugar e responde tudo sem virar um
+/// armazém de dados.
+///
+/// **`noApp` e `ouvindo` são pessoas distintas; o resto são eventos.** A diferença
+/// importa: cinco cliques de uma pessoa são cinco cliques e uma pessoa, e confundir os
+/// dois é como se mede audiência errado. A distinção é feita no Redis, num conjunto por
+/// faixa que expira sozinho — o banco guarda só o número.
+///
+/// **O programa é o que estava no ar quando a faixa começou.** A grade da rádio quase
+/// toda cai em cheio ou meia hora; as exceções da Band são 12h15 e 14h40. Nessas duas, a
+/// faixa inteira vai para o programa que a abriu. É meia hora de imprecisão por virada,
+/// duas vezes por dia — e o preço de não precisar de duas linhas por faixa, com programa
+/// nulo dentro de índice único, que é exatamente o tipo de coisa que quebra em produção
+/// seis meses depois.
+model FaixaAudiencia {
+  id         String   @id @default(cuid())
+  emissoraId String
+  emissora   Emissora @relation(fields: [emissoraId], references: [id], onDelete: Cascade)
+
+  /// O começo da faixa, sempre em :00 ou :30.
+  inicioEm DateTime
+
+  /// Quem estava no ar quando a faixa abriu. Nulo quando a grade está vazia — e vazio é
+  /// informação: é onde o aplicativo mostra "a programação continua".
+  edicaoId   String?
+  programaId String?
+
+  /// Pessoas distintas que usaram o aplicativo nesta faixa, de qualquer jeito.
+  ///
+  /// **Não é a versão fraca de `ouvindo`. É outro indicador, e talvez o mais importante.**
+  /// Ouvir pelo aplicativo consome banda, e muita gente não quer — abre o aplicativo com a
+  /// rádio tocando no carro, no rádio da cozinha ou na caixa de som, e usa a tela para
+  /// votar, conversar e entrar em promoção. Essa pessoa está ouvindo a Band FM e está
+  /// dentro do produto; o que ela não está é gastando os dados dela com o nosso stream.
+  ///
+  /// É aqui que a participação acontece, e é este número que diz o tamanho da base viva.
+  noApp Int @default(0)
+
+  /// Pessoas distintas com o áudio da rádio tocando **pelo aplicativo**.
+  ///
+  /// Subconjunto de `noApp`, e mede uma coisa específica: escuta digital, que custa banda
+  /// ao ouvinte e entrega minuto contável à emissora. Não mede "quem está ouvindo a
+  /// rádio" — a maior parte da audiência da Band nunca vai passar por aqui.
+  ///
+  /// Os dois números convivem de propósito. Ler só este subestima a base; ler só o outro
+  /// esconde quanto de escuta o digital já carrega sozinho.
+  ouvindo Int @default(0)
+
+  /// Somatório dos minutos ouvidos **pelo aplicativo** na faixa. Dividido por `ouvindo`
+  /// dá o tempo médio de escuta digital — o que separa um programa que prende de um que é
+  /// só passagem, entre quem escuta por aqui.
+  minutosOuvidos Int @default(0)
+
+  /// Eventos, não pessoas.
+  plays         Int @default(0)
+  momentos      Int @default(0)
+  mensagens     Int @default(0)
+  participacoes Int @default(0)
+
+  @@unique([emissoraId, inicioEm])
+  @@index([emissoraId, programaId, inicioEm])
+  @@map("faixas_audiencia")
 }
 
 /// Um dia de uma pessoa com a rádio.
