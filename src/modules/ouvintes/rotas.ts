@@ -28,6 +28,7 @@ rotasOuvintes.get('/perfil', exigirOuvinte(), async (req, res, next) => {
       select: {
         nome: true, email: true, telefone: true, cidade: true,
         cpf: true, dataNascimento: true, criadoEm: true,
+        apelido: true, podeSerCitado: true,
       },
     })
     if (!quem) throw erros.naoEncontrado('Ouvinte')
@@ -47,6 +48,8 @@ rotasOuvintes.get('/perfil', exigirOuvinte(), async (req, res, next) => {
         dataNascimento: quem.dataNascimento
           ? quem.dataNascimento.toISOString().slice(0, 10)
           : null,
+        apelido: quem.apelido,
+        podeSerCitado: quem.podeSerCitado,
         desde: quem.criadoEm.toISOString(),
       },
       podeConcorrer: faltando.length === 0,
@@ -65,6 +68,10 @@ const atualizar = z.object({
   cpf: z.string().trim().max(20).optional(),
   /// "1985-03-02" — data de calendário, sem hora e sem fuso.
   dataNascimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida.').optional(),
+  /// Como quer ser chamada no ar. Vazio limpa.
+  apelido: z.string().trim().max(24).nullish(),
+  /// O sim para o nome ir ao ar.
+  podeSerCitado: z.boolean().optional(),
 })
 
 rotasOuvintes.patch('/perfil', exigirOuvinte(), async (req, res, next) => {
@@ -113,6 +120,18 @@ rotasOuvintes.patch('/perfil', exigirOuvinte(), async (req, res, next) => {
             // de calendário deve ser. Ver o comentário em `idade()`.
             ? new Date(`${dados.dataNascimento}T00:00:00.000Z`)
             : undefined,
+          apelido: dados.apelido === undefined ? undefined : (dados.apelido || null),
+          podeSerCitado: dados.podeSerCitado ?? undefined,
+          // **A data do sim fica gravada.** Consentimento sem data é consentimento que
+          // ninguém consegue provar depois — e este aqui autoriza a rádio a dizer o nome
+          // de uma pessoa no ar. Ao tirar a permissão, a data some junto: o que sobra é
+          // "não", e "não" não tem data de quando foi dado.
+          citacaoEm:
+            dados.podeSerCitado === undefined
+              ? undefined
+              : dados.podeSerCitado
+                ? new Date()
+                : null,
         },
       })
     } catch (e) {

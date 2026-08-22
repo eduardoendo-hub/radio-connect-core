@@ -384,6 +384,27 @@ model Ouvinte {
    /// jeito de a trava existir de verdade.
   dataNascimento DateTime? @db.Date
 
+  /// Como a pessoa quer ser chamada no ar.
+  ///
+  /// **No rádio, apelido funciona melhor que nome completo.** "O Dudu, de Guarulhos" soa
+  /// como alguém que o locutor conhece; "Eduardo Endo, de Guarulhos" soa como uma lista
+  /// sendo lida. E há quem não queira o nome inteiro no ar por motivo nenhum além de não
+  /// querer — o apelido resolve os dois casos de uma vez.
+  apelido String?
+
+  /// Permissão para citar esta pessoa no ar.
+  ///
+  /// **Dizer um nome na rádio é publicação, e publicação precisa de sim.** A produção ver
+  /// o cadastro é uma coisa — necessidade de operação, e já era assim. Falar o nome para
+  /// a cidade inteira é outra, e o silêncio de quem nunca foi perguntado não é
+  /// autorização.
+  ///
+  /// Nasce `false` de propósito. O convite é feito no aplicativo com as palavras certas —
+  /// para o ouvinte de rádio, ter o nome citado é prêmio, não incômodo — mas o padrão de
+  /// quem não respondeu nada continua sendo não.
+  podeSerCitado Boolean   @default(false)
+  citacaoEm     DateTime?
+
   /// Dados adicionais pedidos progressivamente, dentro da experiência.
   preferencias Json @default("{}")
 
